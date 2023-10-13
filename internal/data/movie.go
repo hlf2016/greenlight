@@ -10,7 +10,7 @@ type Movie struct {
 	CreatedAt time.Time `json:"-"`
 	Title     string    `json:"title"`
 	Year      int32     `json:"year,omitempty"`
-	RunTime   int32     `json:"run_time,omitempty"` // 播放时长 分钟单位
+	RunTime   RunTime   `json:"run_time,omitempty"` // 播放时长 分钟单位 // 使用 Runtime 类型而不是 int32。请注意，"omitempty "指令仍然有效：如果 Runtime 字段的底层值为 0，那么它将被视为空字段并被省略--而我们刚刚创建的 MarshalJSON() 方法根本不会被调用。
 	Genres    []string  `json:"genres,omitempty"`   // 播放时长 分钟单位
 	Version   int32     `json:"version"`            // 版本号从 1 开始，每次更新电影信息时都会递增
 }

@@ -60,5 +60,15 @@ type Movie struct {
 
 请注意，**`string` 指令只适用于 int*、uint*、float 或 bool 类型的 struct 字段。对于其他类型的 struct 字段，该指令都不起作用。**
 
+### Go 如何在幕后处理 JSON 编码
+> 当 Go 将特定类型编码为 JSON 时，它会查看该类型是否有 MarshalJSON() 方法。如果有，Go 会调用该方法来确定如何编码
+
+严格来说，当 Go 将特定类型编码为 JSON 时，它会查看该类型是否满足 json.Marshaler 接口，如下所示
+
+```go
+type Marshaler interface {
+    MarshalJSON() ([]byte, error)
+}
+```
 
 
