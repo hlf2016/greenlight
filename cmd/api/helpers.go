@@ -23,7 +23,12 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 }
 
 func (app *application) writeJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
-	js, err := json.Marshal(data)
+	// js, err := json.Marshal(data)
+
+	// 使用 json.MarshalIndent() 函数将 空格 添加到编码后的 JSON 中。在这里，我们对每个元素都不使用行前缀（""）和制表符缩进（"\t"）
+	// 方便在 命令行 请求时 查看响应json结构明确 同时 比 json.Marshal 性能要差 30%
+	// 在幕后，json.MarshalIndent() 通过正常调用 json.Marshal()，然后通过独立的 json.Indent() 函数运行 JSON 来添加空白。还有一个反向函数 json.Compact()，可以用来删除 JSON 中的空白。
+	js, err := json.MarshalIndent(data, "", "\t")
 	if err != nil {
 		return err
 	}
