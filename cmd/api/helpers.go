@@ -22,7 +22,9 @@ func (app *application) readIDParam(r *http.Request) (int64, error) {
 	return id, nil
 }
 
-func (app *application) writeJSON(w http.ResponseWriter, status int, data any, headers http.Header) error {
+type envelope map[string]any
+
+func (app *application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
 	// js, err := json.Marshal(data)
 
 	// 使用 json.MarshalIndent() 函数将 空格 添加到编码后的 JSON 中。在这里，我们对每个元素都不使用行前缀（""）和制表符缩进（"\t"）
