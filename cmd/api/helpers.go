@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
@@ -51,12 +52,21 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 }
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any) error {
-	err := json.NewDecoder(r.Body).Decode(&dst)
+	//  使用 http.MaxBytesReader() 将请求正文的大小限制为 1MB。
+	maxBytes := 1_048_576
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+	// 初始化 json.Decoder 并在解码前调用 DisallowUnknownFields() 方法。这意味着，如果现在来自客户端的 JSON 包含任何无法映射到目标目的地的字段，解码器将返回错误信息，而不是直接忽略该字段。
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	// 解码请求正文 dst 本身传入的就是指针
+	err := dec.Decode(dst)
 	if err != nil {
 		// 如果有错误发生 开始分类处理
 		var syntaxError *json.SyntaxError
 		var unmarshalTypeError *json.UnmarshalTypeError
 		var invalidUnmarshalError *json.InvalidUnmarshalError
+		var maxBytesError *http.MaxBytesError
 
 		switch {
 		// 使用 errors.As() 函数检查错误是否属于 json.SyntaxError 类型。如果是，则返回包含问题位置的普通英文错误信息。
@@ -75,12 +85,25 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 		case errors.Is(err, io.EOF):
 			return errors.New("body must not be empty")
 
+		// 如果 JSON 包含一个无法映射到目标目的地的字段，那么 Decode() 将返回格式为 "json: unknown field "<name>"（json：未知字段"<name>"）的错误信息。我们将对此进行检查，从错误信息中提取字段名称，并将其插入我们的自定义错误信息中。请注意，https://github.com/golang/go/issues/29035 上还有一个关于将来将其转化为独立错误类型的开放问题。
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+			return fmt.Errorf("body contains uknown key %s", fieldName)
+
+		// 使用 errors.As() 函数检查错误是否属于 http.MaxBytesError 类型。如果是，则表示请求体超过了 1MB 的大小限制，我们将返回一条明确的错误信息。
+		case errors.As(err, &maxBytesError):
+			return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
 		//	如果我们向 Decode() 传递的内容不是非零指针，就会返回 json.InvalidUnmarshalError 错误。我们会捕捉到这个错误并 panic，而不是向处理程序返回错误。
 		case errors.As(err, &invalidUnmarshalError):
 			panic(err)
 		default:
 			return err
 		}
+	}
+	// 再次调用 Decode()，将指向空匿名结构体的指针作为目标。如果请求正文只包含一个 JSON 值，就会返回一个 io.EOF 错误。因此，如果我们得到其他信息，我们就会知道请求体中还有其他数据，并返回我们自己的自定义错误信息。
+	err = dec.Decode(&struct{}{})
+	if err != io.EOF {
+		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
 }
