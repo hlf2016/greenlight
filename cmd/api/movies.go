@@ -9,10 +9,10 @@ import (
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Title   string   `json:"title"`
-		Year    int32    `json:"year"`
-		RunTime int32    `json:"run_time"`
-		Genres  []string `json:"genres"`
+		Title   string       `json:"title"`
+		Year    int32        `json:"year"`
+		RunTime data.RunTime `json:"run_time"`
+		Genres  []string     `json:"genres"`
 	}
 	// json.Unmarshal() 比 json.Decoder 多用 80% 内存 且更慢一些
 	// err := json.NewDecoder(r.Body).Decode(&input)
