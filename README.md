@@ -71,4 +71,48 @@ type Marshaler interface {
 }
 ```
 
+## 数据库迁移
+### 工具：golang-migrate
+#### 创建 迁移文件
+```shell
+migrate create -seq -ext=.sql -dir=./migrations create_movies_table
+```
+- -seq标志表示我们希望对迁移文件使用顺序编号，如0001、0002、...（而不是默认的Unix时间戳）。
+- -ext标志表示我们要给迁移文件添加 .sql 扩展名。
+- -dir标志表示要将迁移文件保存在 ./migrations 目录中（如果该目录不存在，将自动创建）。
+- create_movies_table 这个名称是一个描述性标签，我们要给迁移文件加上这个标签，以标明其内容。
+
+#### 执行迁移文件
+```shell
+migrate -path=./migrations -database=$GREENLIGHT_DB_DSN up
+```
+
+#### 查看数据库当前所在的迁移版本
+```shell
+migrate -path=./migrations -database=$EXAMPLE_DSN version
+```
+#### 使用 goto 命令 up 或 down 迁移到特定版本
+```shell
+ migrate -path=./migrations -database=$EXAMPLE_DSN goto 1
+```
+
+#### 要回滚最近的迁移
+```shell
+migrate -path=./migrations -database =$EXAMPLE_DSN down 1
+```
+
+#### 回滚所有迁移
+```shell
+ migrate -path=./migrations -database=$EXAMPLE_DSN down
+```
+#### 迁移出现问题时 强行将数据库迁移到指定数据库版本
+```shell
+migrate -path=./migrations -database=$EXAMPLE_DSN force 1
+```
+#### 从亚马逊 S3 和 GitHub 资源库等远程源读取迁移文件
+```shell
+migrate -source="s3://<bucket>/<path>" -database=$EXAMPLE_DSN up
+migrate -source="github://owner/repo/path#ref" -database=$EXAMPLE_DSN up
+migrate -source="github://user:personal-access-token@owner/repo/path#ref" -database=$EXAMPLE_DSN up
+```
 
