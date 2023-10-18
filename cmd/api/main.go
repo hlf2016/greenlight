@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	_ "github.com/lib/pq"
+	"greenlight.311102.xyz/internal/data"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +29,7 @@ type config struct {
 type application struct {
 	config config
 	logger *log.Logger
+	models data.Models
 }
 
 func main() {
@@ -59,9 +61,11 @@ func main() {
 
 	logger.Printf("database connection pool established")
 
+	// 使用 data.NewModels() 函数初始化一个 Models 结构，并将连接池作为参数传递。
 	app := &application{
 		config: cfg,
 		logger: logger,
+		models: data.NewModels(db),
 	}
 
 	srv := &http.Server{
