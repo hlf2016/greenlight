@@ -23,3 +23,10 @@ func NewModels(db *sql.DB) Models {
 		Movies: MovieModel{DB: db},
 	}
 }
+
+// NewMockModels 创建一个辅助函数，返回一个只包含模拟模型的 Models 实例
+func NewMockModels() Models {
+	return Models{
+		Movies: MovieModel{},
+	}
+}
