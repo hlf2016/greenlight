@@ -2,6 +2,8 @@ package data
 
 import (
 	"database/sql"
+	"errors"
+	"github.com/lib/pq"
 	"greenlight.311102.xyz/internal/validator"
 	"time"
 )
@@ -41,11 +43,50 @@ type MovieModel struct {
 }
 
 func (m MovieModel) Insert(movie *Movie) error {
-	return nil
+	query := `
+		INSERT INTO movies (title, year, run_time, genres) 
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at, version`
+	// 创建一个 args 片段，其中包含影片结构中占位符参数的值。在我们的 SQL 查询旁边声明这个片段，有助于清楚地说明在查询中使用了哪些值。
+	// 在幕后，pq.Array() 适配器接收我们的[]字符串片段，并将其转换为 pq.StringArray 类型。反过来，pq.StringArray 类型实现了必要的 driver.Valuer 和 sql.Scanner 接口，以便将我们的本地 []string 片段转换成 PostgreSQL 数据库可以理解的值，并存储在 text[] 数组列中。
+	// 您也可以在 Go 代码中以同样的方式使用 pq.Array() 适配器函数，包括 []bool, []byte, []int32, []int64, []float32 和 []float64 Slice
+	args := []any{movie.Title, movie.Year, movie.RunTime, pq.Array(movie.Genres)}
+	// 使用 QueryRow() 方法在连接池上执行 SQL 查询，将 args 片段作为变量参数传递，并将系统生成的 id、created_at 和版本值扫描到 movie 结构中。
+	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
-	return nil, nil
+	// 我们使用的 PostgreSQL bigserial 类型的电影 ID 默认从 1 开始自动递增，因此我们知道没有电影的 ID 值会小于 1。
+	// 为了避免不必要的数据库调用，我们采取了一个快捷方式，直接返回 ErrRecordNotFound 错误信息
+	if id < 1 {
+		return nil, ErrRecordNotFound
+	}
+
+	var movie Movie
+	query := `
+		SELECT id, created_at, title, year, run_time, genres, version
+		FROM movies
+		WHERE id=$1`
+	err := m.DB.QueryRow(query, id).Scan(
+		&movie.ID,
+		&movie.CreatedAt,
+		&movie.Title,
+		&movie.Year,
+		&movie.RunTime,
+		pq.Array(&movie.Genres),
+		&movie.Version,
+	)
+
+	// 处理任何错误。如果没有找到匹配的影片，Scan() 将返回 sql.ErrNoRows 错误。我们会对此进行检查，并返回我们自定义的 ErrRecordNotFound 错误。
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+	return &movie, nil
 }
 
 func (m MovieModel) Update(movie *Movie) error {
