@@ -116,3 +116,11 @@ migrate -source="github://owner/repo/path#ref" -database=$EXAMPLE_DSN up
 migrate -source="github://user:personal-access-token@owner/repo/path#ref" -database=$EXAMPLE_DSN up
 ```
 
+## 数据库设计
+### movies 
+> 这可能会让你产生这样的疑问：既然电影 ID 从来都不是负数，为什么我们不在 Go 代码中使用无符号 uint64 类型来存储 ID，而要用 int64 类型呢？
+- 第一个原因是 PostgreSQL 没有无符号整数。因此，由于 PostgreSQL 没有无符号整数，这意味着我们应该避免在 Go 代码中为读取/写入 PostgreSQL 的任何值使用 uint 类型。
+- 还有一个更微妙的原因。Go 的数据库/sql 包实际上不支持任何大于 9223372036854775807（int64 的最大值）的整数值。uint64 的值有可能大于这个值，这反过来又会导致 Go 生成类似的运行时错误：
+```shell
+sql: converting argument $1 type: uint64 values with high bit set are not supported
+```
