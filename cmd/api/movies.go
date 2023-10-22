@@ -97,11 +97,14 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// 为了实现 按需修改 而不是 次次 都完全替换 即 将 put 替换成 patch
+	// 因为普通值传递类型 当json解析时候 字段不存在传值时直接将其赋值未该值类型的 0 值  无法区分 缺少字段直接报错 还是未传值 对字段不进行修改
+	// 所以将值传递类型 改为存储指针 对 genres 切片 类型则无需处理 若修改提交上来的 json 数据中缺少某个 字段 则为 nil
 	var input struct {
-		Title   string       `json:"title"`
-		Year    int32        `json:"year"`
-		RunTime data.RunTime `json:"run_time"`
-		Genres  []string     `json:"genres"`
+		Title   *string       `json:"title"`
+		Year    *int32        `json:"year"`
+		RunTime *data.RunTime `json:"run_time"`
+		Genres  []string      `json:"genres"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -110,10 +113,21 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	movie.Title = input.Title
-	movie.Year = input.Year
-	movie.RunTime = input.RunTime
-	movie.Genres = input.Genres
+	if input.Title != nil {
+		movie.Title = *input.Title
+	}
+
+	if input.Year != nil {
+		movie.Year = *input.Year
+	}
+
+	if input.RunTime != nil {
+		movie.RunTime = *input.RunTime
+	}
+
+	if input.Genres != nil {
+		movie.Genres = input.Genres
+	}
 
 	// 验证更新的电影记录，如果任何检查失败，则向客户端发送 422 不可处理实体响应。
 	v := validator.New()
