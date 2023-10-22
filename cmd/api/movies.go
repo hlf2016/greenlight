@@ -6,6 +6,7 @@ import (
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/validator"
 	"net/http"
+	"strconv"
 )
 
 func (app *application) createMovieHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +96,15 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 			app.serverErrorResponse(w, r, err)
 		}
 		return
+	}
+
+	// 如果请求包含 X-Expected-Version 标头，则要验证数据库中的电影版本是否与标头中指定的预期版本一致。
+	if r.Header.Get("X-Expected-Version") != "" {
+		// FormatInt 返回 i 以给定基数表示的字符串，2 <= 基数 <= 36。对于大于等于 10 的数字值，结果使用小写字母 "a "至 "z "表示。
+		if strconv.FormatInt(int64(movie.Version), 32) != r.Header.Get("X-Expected-Version") {
+			app.editConflictResponse(w, r)
+			return
+		}
 	}
 
 	// 为了实现 按需修改 而不是 次次 都完全替换 即 将 put 替换成 patch
