@@ -165,12 +165,16 @@ func (m MovieModel) Delete(id int64) error {
 
 // GetAll 创建一个新的 GetAll() 方法，用于返回 movies Slice。虽然我们现在没有使用它们，但我们已将其设置为接受各种过滤器参数作为参数。
 func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
-	query := `SELECT id, created_at, title, year, run_time, genres, version FROM movies ORDER BY id`
+	query := `SELECT id, created_at, title, year, run_time, genres, version 
+        FROM movies
+		WHERE (LOWER(title) = LOWER($1) OR $1 = '')
+		AND (genres @> $2 OR $2='{}')
+		ORDER BY id`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := m.DB.QueryContext(ctx, query)
+	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres))
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +182,10 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// 重要的是，推迟调用 rows.Close()，以确保在 GetAll() 返回之前关闭结果集。
 	defer rows.Close()
 
-	var movies []*Movie
+	// 此处是将 movies 声明为 空的 *Movie slice 如果下面不存在数据 则最终响应结果为 []
+	movies := []*Movie{}
+	// 如果 采用下面这种方式 声明为 slice 的默认值 nil 下面不存在数据时 那么最终响应结果为 null
+	// var movie []*Movie
 
 	for rows.Next() {
 		var movie Movie
