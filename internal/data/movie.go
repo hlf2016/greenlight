@@ -165,9 +165,14 @@ func (m MovieModel) Delete(id int64) error {
 
 // GetAll 创建一个新的 GetAll() 方法，用于返回 movies Slice。虽然我们现在没有使用它们，但我们已将其设置为接受各种过滤器参数作为参数。
 func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	// 支持全文搜索
+	// to_tsvector('simple', title) 函数接收一个电影标题并将其拆分成词目。我们指定的是 simple 配置，这意味着词目只是标题中单词的小写版本。
+	// 例如，电影标题 "The Breakfast Club（早餐俱乐部）"将被分割成词素 "breakfast""club""the"。
+	// 其他 "non-simple" 配置可能会对词目应用额外的规则，如删除常用词或应用特定语言的词干。
+	// plainto_tsquery('simple', $1) 函数接收搜索值，并将其转化为 PostgreSQL 全文搜索可以理解的格式化查询词。它对†搜索值进行规范化处理（再次使用简单配置），去掉所有特殊字符，并在单词之间插入和运算符 &。例如，搜索值 "The Club"的结果就是查询词 "the " & "club"。
 	query := `SELECT id, created_at, title, year, run_time, genres, version 
         FROM movies
-		WHERE (LOWER(title) = LOWER($1) OR $1 = '')
+		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (genres @> $2 OR $2='{}')
 		ORDER BY id`
 
