@@ -52,8 +52,12 @@ func (m MovieModel) Insert(movie *Movie) error {
 	// 在幕后，pq.Array() 适配器接收我们的[]字符串片段，并将其转换为 pq.StringArray 类型。反过来，pq.StringArray 类型实现了必要的 driver.Valuer 和 sql.Scanner 接口，以便将我们的本地 []string 片段转换成 PostgreSQL 数据库可以理解的值，并存储在 text[] 数组列中。
 	// 您也可以在 Go 代码中以同样的方式使用 pq.Array() 适配器函数，包括 []bool, []byte, []int32, []int64, []float32 和 []float64 Slice
 	args := []any{movie.Title, movie.Year, movie.RunTime, pq.Array(movie.Genres)}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// 使用 QueryRow() 方法在连接池上执行 SQL 查询，将 args 片段作为变量参数传递，并将系统生成的 id、created_at 和版本值扫描到 movie 结构中。
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
@@ -66,8 +70,12 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	var movie Movie
 	// 更新查询，将 pg_sleep(10) 作为第一个值返回。
 	// 模拟长时间查询
+	/*query := `
+	SELECT pg_sleep(10), id, created_at, title, year, run_time, genres, version
+	FROM movies
+	WHERE id=$1`*/
 	query := `
-		SELECT pg_sleep(10), id, created_at, title, year, run_time, genres, version
+		SELECT id, created_at, title, year, run_time, genres, version
 		FROM movies
 		WHERE id=$1`
 
@@ -80,7 +88,7 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	// 重要的是，更新 Scan() 参数，以便将 pg_sleep(10) 返回值扫描为 []byte 片段。
 	// 使用 QueryRowContext() 方法执行查询，将带有截止日期的上下文作为第一个参数传递。
 	err := m.DB.QueryRowContext(ctx, query, id).Scan(
-		&[]byte{},
+		//&[]byte{}, // 测试用 对应上面的 pg_sleep() 注释掉
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
@@ -110,11 +118,15 @@ func (m MovieModel) Update(movie *Movie) error {
 		movie.Title,
 		movie.Year,
 		movie.RunTime,
-		pq.Array(&movie.Genres),
+		pq.Array(movie.Genres),
 		movie.ID,
 		movie.Version,
 	}
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
