@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/julienschmidt/httprouter"
+	"greenlight.311102.xyz/internal/validator"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -106,4 +108,38 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 		return errors.New("body must only contain a single JSON value")
 	}
 	return nil
+}
+
+// readString() helper 会从查询字符串中返回一个字符串值，如果找不到匹配的键，则返回所提供的默认值。
+func (app *application) readString(qs url.Values, key, defaultValue string) string {
+	// 从查询字符串中提取给定键的值。如果不存在键，将返回空字符串""。
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	return s
+}
+
+// readCSV() helper 从查询字符串中读取字符串值，然后以逗号字符为分割点。如果找不到匹配的键，则返回所提供的默认值。
+func (app *application) readCSV(qs url.Values, key string, defaultValue []string) []string {
+	csv := qs.Get(key)
+	if csv == "" {
+		return defaultValue
+	}
+	return strings.Split(csv, ",")
+}
+
+// readInt() helper 从查询字符串中读取字符串值，并在返回前将其转换为整数。如果找不到匹配的键，则返回所提供的默认值。如果无法将值转换为整数，则会在提供的 Validator 实例中记录一条错误信息。
+func (app *application) readInt(qs url.Values, key string, defaultValue int, v *validator.Validator) int {
+	s := qs.Get(key)
+	if s == "" {
+		return defaultValue
+	}
+	// 尝试将数值转换为 int。如果失败，则在验证器实例中添加错误信息，并返回默认值
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		v.AddError(key, "must be an integer value")
+		return defaultValue
+	}
+	return i
 }

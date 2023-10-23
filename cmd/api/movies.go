@@ -185,3 +185,35 @@ func (app *application) deleteMovieHandler(w http.ResponseWriter, r *http.Reques
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	// 为了与其他处理程序保持一致，我们将定义一个输入结构来保存来自请求查询字符串的预期值。
+	var input struct {
+		Title  string
+		Genres []string
+		data.Filters
+	}
+
+	v := validator.New()
+
+	qs := r.URL.Query()
+
+	// 使用我们的助手提取标题和基因查询字符串值，如果客户端没有提供，则分别返回默认的空字符串和空片段值
+	input.Title = app.readString(qs, "title", "")
+	input.Genres = app.readCSV(qs, "genres", []string{})
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+	// 提取排序查询字符串值，如果客户端未提供，则返回到 "id"（这意味着将根据影片 ID 升序排序）。
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+
+	input.Filters.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+
+	// 检查验证器实例是否有任何错误，必要时使用 failedValidationResponse() 助手向客户端发送响应。
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// 注意，%+v 会输出字段名和相应的值，而 "\n" 则是一个换行符，使输出更易读。
+	fmt.Fprintf(w, "%+v\n", input)
+}
