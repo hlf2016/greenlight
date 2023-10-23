@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/lib/pq"
@@ -63,11 +64,23 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	var movie Movie
+	// 更新查询，将 pg_sleep(10) 作为第一个值返回。
+	// 模拟长时间查询
 	query := `
-		SELECT id, created_at, title, year, run_time, genres, version
+		SELECT pg_sleep(10), id, created_at, title, year, run_time, genres, version
 		FROM movies
 		WHERE id=$1`
-	err := m.DB.QueryRow(query, id).Scan(
+
+	// 使用 context.WithTimeout() 函数创建一个 context.Context，其超时期限为 3 秒。
+	// 请注意，我们使用空的 context.Background() 作为 "父 "上下文。
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// 重要的是，使用 defer 可以确保我们在 Get() 方法返回之前取消上下文。
+	defer cancel()
+
+	// 重要的是，更新 Scan() 参数，以便将 pg_sleep(10) 返回值扫描为 []byte 片段。
+	// 使用 QueryRowContext() 方法执行查询，将带有截止日期的上下文作为第一个参数传递。
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
+		&[]byte{},
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
