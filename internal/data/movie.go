@@ -130,7 +130,7 @@ func (m MovieModel) Update(movie *Movie) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return ErrEditConfict
+			return ErrEditConflict
 		default:
 			return err
 		}
@@ -161,4 +161,47 @@ func (m MovieModel) Delete(id int64) error {
 	}
 
 	return nil
+}
+
+// GetAll 创建一个新的 GetAll() 方法，用于返回 movies Slice。虽然我们现在没有使用它们，但我们已将其设置为接受各种过滤器参数作为参数。
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+	query := `SELECT id, created_at, title, year, run_time, genres, version FROM movies ORDER BY id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	// 重要的是，推迟调用 rows.Close()，以确保在 GetAll() 返回之前关闭结果集。
+	defer rows.Close()
+
+	var movies []*Movie
+
+	for rows.Next() {
+		var movie Movie
+		// 将该行的值扫描到 "Movie"结构中。请再次注意，我们在 genres 字段上使用了 pq.Array() 适配器。
+		err := rows.Scan(
+			&movie.ID,
+			&movie.CreatedAt,
+			&movie.Title,
+			&movie.Year,
+			&movie.RunTime,
+			pq.Array(&movie.Genres),
+			&movie.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		movies = append(movies, &movie)
+	}
+	// 当 rows.Next() 循环结束后，调用 rows.Err() 来获取迭代过程中遇到的任何错误。
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return movies, nil
 }
