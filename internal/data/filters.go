@@ -39,3 +39,12 @@ func (f Filters) sortDirection() string {
 	}
 	return "ASC"
 }
+
+func (f Filters) limit() int {
+	return f.PageSize
+}
+
+func (f Filters) offset() int {
+	// 注意这里可能出现 整数溢出的情况  但是好在我们在 ValidateFilters 已经进行了限制  可规避这种风险
+	return (f.Page - 1) * f.PageSize
+}
