@@ -130,3 +130,54 @@ migrate -source="github://user:personal-access-token@owner/repo/path#ref" -datab
 ```shell
 sql: converting argument $1 type: uint64 values with high bit set are not supported
 ```
+
+#### 全文搜索
+您可以在 PostgreSQL 中运行 \dF 元命令，获取所有可用配置的列表
+使用其他的配置，如 english
+```postgresql
+SELECT id, created_at, title, year, runtime, genres, version
+FROM movies
+WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '')
+AND (genres @> $2 OR $2 = '{}')
+ORDER BY id
+```
+#### 模糊匹配 使用 STRPOS 和 ILIKE
+##### STRPOS
+> PostgreSQL STRPOS() 函数允许您检查特定数据库字段中是否存在子串。
+```postgresql
+SELECT id, created_at, title, year, runtime, genres, version
+FROM movies
+WHERE (STRPOS(LOWER(title), LOWER($1)) > 0 OR $1 = '')
+AND (genres @> $2 OR $2 = '{}')
+ORDER BY id
+```
+缺点：
+- 从客户的角度来看，这样做的缺点是可能会返回一些不直观的结果。例如，在我们的数据集中搜索 title=the 会同时返回 The Breakfast Club 和 Black Panther。
+- 从服务器的角度来看，这也不是大型数据集的理想选择。因为没有有效的方法来索引标题字段以查看是否满足 STRPOS() condition 条件，这意味着每次运行查询时都可能需要进行全表扫描
+##### ILIKE
+> 另一个选项是 ILIKE 运算符，通过它可以查找与特定（不区分大小写）模式匹配的记录。
+```postgresql
+SELECT id, created_at, title, year, runtime, genres, version
+FROM movies
+WHERE (title ILIKE $1 OR $1 = '')
+AND (genres @> $2 OR $2 = '{}')
+ORDER BY id
+```
+- 从服务器角度看，这种方法更好，因为可以使用 pg_trgm 扩展和 GIN 索引在标题字段上创建索引 [post](https://niallburkley.com/blog/index-columns-for-like-in-postgres/)
+- 从客户端来说，这种方法也比 STRPOS() 方法要好，因为他们可以通过在搜索词前缀/后缀添加 % 通配符（在 URL 查询字符串中需要转义为 %25）来控制匹配行为。例如，要搜索标题以 "the "开头的电影，客户可以发送查询字符串参数 title=the%25
+#### 排序
+> 如果我们不包含 ORDER BY 子句，那么 PostgreSQL 可能会以任何顺序返回电影，而且每次运行查询时，顺序可能会改变，也可能不会改变。
+
+幸运的是，保证顺序非常简单，我们只需确保 ORDER BY 子句始终包含主键列（或其他具有唯一性约束的列）。因此，在我们的例子中，我们可以对 id 列进行二级排序，以确保顺序始终一致。就像这样:
+
+```postgresql
+SELECT id, created_at, title, year, runtime, genres, version
+FROM movies
+WHERE (STRPOS(LOWER(title), LOWER($1)) > 0 OR $1 = '')
+AND (genres @> $2 OR $2 = '{}')
+ORDER BY year DESC, id ASC
+```
+
+
+
+

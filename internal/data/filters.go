@@ -1,6 +1,9 @@
 package data
 
-import "greenlight.311102.xyz/internal/validator"
+import (
+	"greenlight.311102.xyz/internal/validator"
+	"strings"
+)
 
 type Filters struct {
 	Page         int
@@ -17,4 +20,22 @@ func ValidateFilters(v *validator.Validator, f Filters) {
 
 	// 检查排序参数是否与安全列表中的值匹配。
 	v.Check(validator.PermittedValue(f.Sort, f.SortSafeList...), "sort", "invalid sort value")
+}
+
+// 检查客户提供的 "排序 "字段是否与安全列表中的某个条目相匹配，如果相匹配，则从 "sort" 字段中提取列名，删除前导连字符（如果存在）。
+func (f Filters) sortColumn() string {
+	for _, safeValue := range f.SortSafeList {
+		if safeValue == f.Sort {
+			return strings.TrimPrefix(f.Sort, "-")
+		}
+	}
+	panic("unsafe sort parameter:" + f.Sort)
+}
+
+// 根据排序字段的前缀字符，返回排序方向（"ASC "或 "DESC"）。
+func (f Filters) sortDirection() string {
+	if strings.HasPrefix(f.Sort, "-") {
+		return "DESC"
+	}
+	return "ASC"
 }

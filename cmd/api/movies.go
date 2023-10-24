@@ -206,7 +206,7 @@ func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request
 	// 提取排序查询字符串值，如果客户端未提供，则返回到 "id"（这意味着将根据影片 ID 升序排序）。
 	input.Filters.Sort = app.readString(qs, "sort", "id")
 
-	input.Filters.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+	input.Filters.SortSafeList = []string{"id", "title", "year", "run_time", "-id", "-title", "-year", "-run_time"}
 
 	// 检查验证器实例是否有任何错误，必要时使用 failedValidationResponse() 助手向客户端发送响应。
 	if data.ValidateFilters(v, input.Filters); !v.Valid() {

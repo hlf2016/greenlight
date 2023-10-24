@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/lib/pq"
 	"greenlight.311102.xyz/internal/validator"
 	"time"
@@ -170,11 +171,13 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// 例如，电影标题 "The Breakfast Club（早餐俱乐部）"将被分割成词素 "breakfast""club""the"。
 	// 其他 "non-simple" 配置可能会对词目应用额外的规则，如删除常用词或应用特定语言的词干。
 	// plainto_tsquery('simple', $1) 函数接收搜索值，并将其转化为 PostgreSQL 全文搜索可以理解的格式化查询词。它对†搜索值进行规范化处理（再次使用简单配置），去掉所有特殊字符，并在单词之间插入和运算符 &。例如，搜索值 "The Club"的结果就是查询词 "the " & "club"。
-	query := `SELECT id, created_at, title, year, run_time, genres, version 
-        FROM movies
+
+	query := fmt.Sprintf(`
+		SELECT id, created_at, title, year, run_time, genres, version
+		FROM movies
 		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
-		AND (genres @> $2 OR $2='{}')
-		ORDER BY id`
+		AND (genres @> $2 OR $2 = '{}')
+		ORDER BY %s %s, id ASC`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
