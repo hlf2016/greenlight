@@ -165,7 +165,7 @@ func (m MovieModel) Delete(id int64) error {
 }
 
 // GetAll 创建一个新的 GetAll() 方法，用于返回 movies Slice。虽然我们现在没有使用它们，但我们已将其设置为接受各种过滤器参数作为参数。
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
 	// 支持全文搜索
 	// to_tsvector('simple', title) 函数接收一个电影标题并将其拆分成词目。我们指定的是 simple 配置，这意味着词目只是标题中单词的小写版本。
 	// 例如，电影标题 "The Breakfast Club（早餐俱乐部）"将被分割成词素 "breakfast""club""the"。
@@ -173,7 +173,7 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 	// plainto_tsquery('simple', $1) 函数接收搜索值，并将其转化为 PostgreSQL 全文搜索可以理解的格式化查询词。它对†搜索值进行规范化处理（再次使用简单配置），去掉所有特殊字符，并在单词之间插入和运算符 &。例如，搜索值 "The Club"的结果就是查询词 "the " & "club"。
 
 	query := fmt.Sprintf(`
-		SELECT id, created_at, title, year, run_time, genres, version
+		SELECT count(*) OVER(), id, created_at, title, year, run_time, genres, version
 		FROM movies
 		WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 		AND (genres @> $2 OR $2 = '{}')
@@ -187,12 +187,13 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 
 	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
 	// 重要的是，推迟调用 rows.Close()，以确保在 GetAll() 返回之前关闭结果集。
 	defer rows.Close()
 
+	totalRecords := 0
 	// 此处是将 movies 声明为 空的 *Movie slice 如果下面不存在数据 则最终响应结果为 []
 	movies := []*Movie{}
 	// 如果 采用下面这种方式 声明为 slice 的默认值 nil 下面不存在数据时 那么最终响应结果为 null
@@ -202,6 +203,7 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 		var movie Movie
 		// 将该行的值扫描到 "Movie"结构中。请再次注意，我们在 genres 字段上使用了 pq.Array() 适配器。
 		err := rows.Scan(
+			&totalRecords,
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
@@ -211,15 +213,17 @@ func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*M
 			&movie.Version,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 
 		movies = append(movies, &movie)
 	}
 	// 当 rows.Next() 循环结束后，调用 rows.Err() 来获取迭代过程中遇到的任何错误。
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return movies, nil
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return movies, metadata, nil
 }
