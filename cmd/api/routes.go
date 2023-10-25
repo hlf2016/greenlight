@@ -6,9 +6,9 @@ import (
 )
 
 // 更新 routes() 方法，使其返回 http.Handler 而不是 httprouter.Router
+// httprouter.Router实现了http.Handler接口 ServeHTTP
 func (app *application) routes() http.Handler {
 	router := httprouter.New()
-
 	// 使用 http.HandlerFunc() 适配器将 notFoundResponse() 辅助程序转换为 http.Handler 程序，然后将其设置为 404 Not Found 响应的自定义错误处理程序。
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	// 同样，将 methodNotAllowedResponse() 转换为 http.Handler，并将其设置为 405 Method Not Allowed 响应的自定义错误处理程序。
@@ -22,5 +22,5 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodGet, "/v1/movies", app.listMoviesHandler)
 
 	// 用 panic 恢复中间件包裹路由器。
-	return app.recoverPanic(router)
+	return app.recoverPanic(app.rateLimit(router))
 }
