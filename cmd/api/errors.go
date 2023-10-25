@@ -7,7 +7,11 @@ import (
 
 // logError() 方法是记录错误信息的通用助手。在本书的后面部分，我们将对该方法进行升级，以使用结构化日志，并记录有关请求的其他信息，包括 HTTP 方法和 URL。
 func (app *application) logError(r *http.Request, err error) {
-	app.logger.Print(err)
+	// 使用 PrintError() 方法记录错误信息，并将当前请求方法和 URL 作为属性包含在日志条目中
+	app.logger.PrintError(err, map[string]string{
+		"request_method": r.Method,
+		"request_url":    r.URL.String(),
+	})
 }
 
 // errorResponse() 方法是一个通用辅助方法，用于向客户端发送带有给定状态代码的 JSON 格式错误消息。请注意，我们为消息参数使用的是任意类型，而不仅仅是字符串类型，因为这让我们可以更灵活地处理响应中包含的值。

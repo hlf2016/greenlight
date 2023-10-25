@@ -7,6 +7,7 @@ import (
 	"fmt"
 	_ "github.com/lib/pq"
 	"greenlight.311102.xyz/internal/data"
+	"greenlight.311102.xyz/internal/jsonlog"
 	"log"
 	"net/http"
 	"os"
@@ -28,7 +29,7 @@ type config struct {
 
 type application struct {
 	config config
-	logger *log.Logger
+	logger *jsonlog.Logger // 将日志记录器字段改为 *jsonlog.Logger 类型，而不是 log.Logger。
 	models data.Models
 }
 
@@ -48,18 +49,21 @@ func main() {
 	flag.Parse()
 
 	// 初始化一个新的日志记录器，将信息写入标准输出流，并以当前日期和时间为前缀。
-	logger := log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
+	// logger := log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
+	// 初始化一个新的 jsonlog.Logger 日志记录器，该日志记录器会将任何严重程度达到或超过 INFO 的信息写入标准输出流。
+	logger := jsonlog.New(os.Stdout, jsonlog.LevelInfo)
 
 	// 调用 openDB() 辅助函数（见下文）来创建连接池，并传入配置结构。如果返回错误，我们会记录并立即退出应用程序
 	db, err := openDB(cfg)
 	if err != nil {
-		logger.Fatal(err)
+		// 使用 PrintFatal() 方法写入包含 FATAL 级别错误的日志条目并退出。我们没有其他属性要包含在日志条目中，因此我们将 nil 作为第二个参数传递。
+		logger.PrintFatal(err, nil)
 	}
 
 	// 延迟调用 db.Close()，以便在 main() 函数退出之前关闭连接池。
 	defer db.Close()
 
-	logger.Printf("database connection pool established")
+	logger.PrintInfo("database connection pool established", nil)
 
 	// 使用 data.NewModels() 函数初始化一个 Models 结构，并将连接池作为参数传递。
 	app := &application{
@@ -69,16 +73,22 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      app.routes(),
+		Addr:    fmt.Sprintf(":%d", cfg.port),
+		Handler: app.routes(),
+		// 遗憾的是，我们无法直接将 http.Server 设置为使用新的日志记录器类型。相反，你需要利用我们的日志记录器满足 io.Writer 接口这一事实（多亏了我们为它添加的 Write() 方法），并将 http.Server 设置为使用标准库中的常规 log.Logger 实例，该实例将我们自己的日志记录器作为目标目标写入。
+		// 使用 log.New() 函数创建一个新的 Go log.Logger 实例，并将我们的自定义 Logger 作为第一个参数传递进去。""和 0 表示 log.Logger 实例不应使用前缀或任何标志。
+		ErrorLog:     log.New(logger, "", 0),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	logger.Printf("Starting %s server on %d", cfg.env, cfg.port)
+	logger.PrintInfo("starting server", map[string]string{
+		"addr": srv.Addr,
+		"env":  cfg.env,
+	})
 	err = srv.ListenAndServe()
-	logger.Fatal(err)
+	logger.PrintFatal(err, nil)
 }
 
 // openDB() 函数返回一个 sql.DB 连接池
