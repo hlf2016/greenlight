@@ -4,12 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	_ "github.com/lib/pq"
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/jsonlog"
-	"log"
-	"net/http"
 	"os"
 	"time"
 )
@@ -82,23 +79,10 @@ func main() {
 		models: data.NewModels(db),
 	}
 
-	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.port),
-		Handler: app.routes(),
-		// 遗憾的是，我们无法直接将 http.Server 设置为使用新的日志记录器类型。相反，你需要利用我们的日志记录器满足 io.Writer 接口这一事实（多亏了我们为它添加的 Write() 方法），并将 http.Server 设置为使用标准库中的常规 log.Logger 实例，该实例将我们自己的日志记录器作为目标目标写入。
-		// 使用 log.New() 函数创建一个新的 Go log.Logger 实例，并将我们的自定义 Logger 作为第一个参数传递进去。""和 0 表示 log.Logger 实例不应使用前缀或任何标志。
-		ErrorLog:     log.New(logger, "", 0),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
 	}
-
-	logger.PrintInfo("starting server", map[string]string{
-		"addr": srv.Addr,
-		"env":  cfg.env,
-	})
-	err = srv.ListenAndServe()
-	logger.PrintFatal(err, nil)
 }
 
 // openDB() 函数返回一个 sql.DB 连接池
