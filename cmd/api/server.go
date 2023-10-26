@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,6 +24,9 @@ func (app *application) serve() error {
 		WriteTimeout: 30 * time.Second,
 	}
 
+	// 创建 shutdownError 频道。我们将用它来接收优雅关闭（）函数返回的任何错误。
+	shutdownError := make(chan error)
+
 	// 启动后台程序
 	go func() {
 		// 我们在这里需要使用缓冲通道，因为 signal.Notify() 在向 quit 通道发送信号时不会等待接收器可用。
@@ -38,17 +43,48 @@ func (app *application) serve() error {
 		s := <-quit
 
 		// 记录一条信息，说明信号已被捕获。请注意，我们还调用了信号的 String() 方法来获取信号名称，并将其包含在日志条目属性中。
-		app.logger.PrintInfo("caught signal", map[string]string{
+		// 更新日志条目，将 "caught signal" 改为 "shutting down server"。
+		app.logger.PrintInfo("shutting down server", map[string]string{
 			"signal": s.String(),
 		})
 
+		// 创建一个超时 20 秒的上下文。
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		// 在服务器上调用 Shutdown()，并传入我们刚刚创建的上下文。
+		// 如果优雅关机成功，Shutdown() 将返回 nil，否则将返回错误（可能是因为关闭监听器出现问题，或者因为在 20 秒的上下文截止时间到来之前关机没有完成）。
+		// 我们会将此返回值转发到 shutdownError 频道。
+
 		// 以 0（成功）状态码退出应用程序。
-		os.Exit(0)
+		// os.Exit(0)
+		// 将 shutdown 操作信息放入 shutdownError channel 中
+		shutdownError <- srv.Shutdown(ctx)
 	}()
 
 	app.logger.PrintInfo("starting server", map[string]string{
 		"addr": srv.Addr,
 		"env":  app.config.env,
 	})
-	return srv.ListenAndServe()
+
+	// 在服务器上调用 Shutdown() 会导致 ListenAndServe() 立即返回 http.ErrServerClosed 错误。
+	// 因此，如果我们看到这个错误，其实是件好事，表明优雅关机已经开始。
+	// 因此，我们专门为此进行了检查，只有在不是 http.ErrServerClosed 时才返回错误信息。
+	err := srv.ListenAndServe()
+	if !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	// 否则，我们将在 shutdownError 频道上等待接收 Shutdown() 的返回值。如果返回值是错误，我们就知道优雅关机出现了问题，并返回错误信息。
+	err = <-shutdownError
+	if err != nil {
+		return err
+	}
+
+	// 此时，我们知道优雅关机已成功完成，并记录了一条 "stopped server "信息。
+	app.logger.PrintInfo("stopped server", map[string]string{
+		"addr": srv.Addr,
+	})
+
+	return nil
 }
