@@ -25,6 +25,12 @@ type config struct {
 		maxIdleConns int
 		maxIdleTime  string
 	}
+	// 添加一个新的限制器结构，其中包含每秒请求数和突发值字段，以及一个布尔字段，我们可以用它来启用/禁用全部速率限制。
+	limiter struct {
+		rps     float64
+		burst   int
+		enabled bool
+	}
 }
 
 type application struct {
@@ -46,6 +52,10 @@ func main() {
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
 
+	// 创建 limiter 配置 命令行标志，将设置值读入配置结构。注意到 "enabled" 设置的默认值是 true 吗？
+	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
+	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
+	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 	flag.Parse()
 
 	// 初始化一个新的日志记录器，将信息写入标准输出流，并以当前日期和时间为前缀。

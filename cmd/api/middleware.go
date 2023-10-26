@@ -61,41 +61,42 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 	// 我们返回的函数是一个闭包，它 "关闭 "了限制器变量。
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 从请求中提取客户端的 IP 地址。
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			app.serverErrorResponse(w, r, err)
-			return
-		}
+		if app.config.limiter.enabled {
+			// 从请求中提取客户端的 IP 地址。
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
 
-		// 上互斥锁，以防止这段代码被同时执行。
-		mu.Lock()
+			// 上互斥锁，以防止这段代码被同时执行。
+			mu.Lock()
 
-		// 检查 IP 地址是否已存在于地图中。如果不存在，则初始化一个新的速率限制器，并将 IP 地址和限制器添加到映射中。
-		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
-		}
-		clients[ip].lastSeen = time.Now()
+			// 检查 IP 地址是否已存在于地图中。如果不存在，则初始化一个新的速率限制器，并将 IP 地址和限制器添加到映射中。
+			if _, found := clients[ip]; !found {
+				clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
+			}
+			clients[ip].lastSeen = time.Now()
 
-		// 调用 limiter.Allow() 查看请求是否允许，如果不允许，则调用 rateLimitExceededResponse() 辅助程序返回 429 太多请求响应（我们稍后将创建该辅助程序）。
-		// 每当我们调用速率限制器上的 Allow() 方法时，就会从邮筒中消耗一个令牌。如果桶中没有剩余的令牌，Allow() 方法将返回 false，并触发向客户端发送 429 太多请求的响应。
-		// 还需要注意的是，Allow() 方法后面的代码受互斥保护，可以安全并发使用。
-		//if !limiter.Allow() {
-		//	app.rateLimitExceededResponse(w, r)
-		//	return
-		//}
+			// 调用 limiter.Allow() 查看请求是否允许，如果不允许，则调用 rateLimitExceededResponse() 辅助程序返回 429 太多请求响应（我们稍后将创建该辅助程序）。
+			// 每当我们调用速率限制器上的 Allow() 方法时，就会从邮筒中消耗一个令牌。如果桶中没有剩余的令牌，Allow() 方法将返回 false，并触发向客户端发送 429 太多请求的响应。
+			// 还需要注意的是，Allow() 方法后面的代码受互斥保护，可以安全并发使用。
+			//if !limiter.Allow() {
+			//	app.rateLimitExceededResponse(w, r)
+			//	return
+			//}
 
-		// 调用当前 IP 地址的速率限制器上的 Allow() 方法。如果请求不被允许，则解锁互斥器 并发送 429 太多请求响应，就像之前一样。
-		if !clients[ip].limiter.Allow() {
+			// 调用当前 IP 地址的速率限制器上的 Allow() 方法。如果请求不被允许，则解锁互斥器 并发送 429 太多请求响应，就像之前一样。
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimitExceededResponse(w, r)
+				return
+			}
+
+			// 最重要的是，在调用链中的下一个处理程序之前，要先解开互斥锁。
+			// 请注意，我们不能使用 defer 来解锁互斥，因为这意味着在该中间件下游的所有处理程序都返回之前，互斥不会被解锁。
 			mu.Unlock()
-			app.rateLimitExceededResponse(w, r)
-			return
 		}
-
-		// 最重要的是，在调用链中的下一个处理程序之前，要先解开互斥锁。
-		// 请注意，我们不能使用 defer 来解锁互斥，因为这意味着在该中间件下游的所有处理程序都返回之前，互斥不会被解锁。
-		mu.Unlock()
-
 		next.ServeHTTP(w, r)
 	})
 }
