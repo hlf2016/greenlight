@@ -177,6 +177,11 @@ WHERE (STRPOS(LOWER(title), LOWER($1)) > 0 OR $1 = '')
 AND (genres @> $2 OR $2 = '{}')
 ORDER BY year DESC, id ASC
 ```
+## psql 查询
+> psql 工具总是以十六进制编码字符串的形式显示字节值。因此，上面输出中的 password_hash 字段显示的是 bcrypt 哈希值的十六进制编码。如果需要，也可以运行下面的查询，将普通字符串版本追加到表中：
+```postgresql
+SELECT * , encode(password_hash, 'escape') FROM users .
+```
 
 
 
