@@ -31,8 +31,8 @@ func New(host string, port int, username, password, sender string) Mailer {
 	}
 }
 
-// 在 Mailer 类型上定义 Send() 方法。该方法的第一个参数是收件人电子邮件地址，第二个参数是包含模板的文件名，第三个参数是模板的任何动态数据。
-func (m Mailer) send(recipient, templateFile string, data any) error {
+// Send 在 Mailer 类型上定义 Send() 方法。该方法的第一个参数是收件人电子邮件地址，第二个参数是包含模板的文件名，第三个参数是模板的任何动态数据。
+func (m Mailer) Send(recipient, templateFile string, data any) error {
 	// 使用 ParseFS() 方法从嵌入式文件系统中解析所需的模板文件。
 	tmpl, err := template.New("email").ParseFS(templateFS, "templates/"+templateFile)
 	if err != nil {
