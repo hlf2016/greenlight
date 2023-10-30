@@ -70,9 +70,15 @@ func (m Mailer) Send(recipient, templateFile string, data any) error {
 
 	// 调用拨号器上的 DialAndSend() 方法，并传入要发送的信息。
 	// 该方法会打开与 SMTP 服务器的连接，发送信息，然后关闭连接。如果出现超时，则会返回 "dial tcp: i/o timeout "错误信息。
-	err = m.dialer.DialAndSend(msg)
-	if err != nil {
-		return err
+	for i := 1; i <= 3; i++ { // 三次请求重试
+		err = m.dialer.DialAndSend(msg)
+		// 在上面的代码中，我们使用 if nil == err 子句来检查发送是否成功，而不是 if err == nil。它们在功能上是等同的，
+		// 但将 nil 作为子句的第一项，会让人觉得有点突兀，也不容易与更常见的 if err != nil 子句混淆。
+		if nil == err { // 说明发送成功
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
-	return nil
+
+	return err
 }
