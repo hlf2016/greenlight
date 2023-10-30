@@ -210,6 +210,13 @@ curl -d "$BODY" localhost:4000/v1/users
 
 **避免响应结果的差异化，从而被找出规律**
 
-
+## 使用嵌入式文件系统
+- 您只能在包级别的全局变量上使用 go:embed 指令，而不能在函数或方法中使用。如果试图在函数或方法中使用该指令，编译时会出现 "go:embed cannot apply to var inside func "的错误。
+- 使用 go:embed "<path>"指令创建嵌入式文件系统时，路径应相对于包含该指令的源代码文件。因此，在我们的例子中，go:embed "templates" 嵌入了 internal/mailer/templates 目录的内容。
+- 嵌入式文件系统根目录是包含 go:embed 指令的目录。因此，在我们的例子中，要获取 user_welcome.tmpl 文件，我们需要从嵌入式文件系统中的 templates/user_welcome.tmpl 文件中获取。
+- 路径不能包含.或.元素，也不能以.开头或结尾。 这基本上限制了你只能嵌入与带有 go:embed 指令的源代码位于同一目录（或子目录）中的文件。
+- 如果路径是一个目录，那么目录中的所有文件都会被递归嵌入，名称以 . 或 _ 开头的文件除外。如果要包含这些文件，应在路径中使用通配符，如 go:embed "templates/*"
+- 您可以在一条指令中指定多个目录和文件。例如： go:embed "images" "styles/css" "favicon.ico" .
+- 路径分隔符应始终为正斜线 / ，即使在 Windows 机器上也是如此。
 
 
