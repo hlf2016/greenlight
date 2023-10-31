@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/validator"
 	"net/http"
@@ -54,6 +55,12 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	// 单独开一个 goroutine 来进行邮件发送 减少程序阻塞
 	go func() {
+		// 运行一个延迟函数，使用 recover() 来捕捉任何恐慌，并记录错误信息，而不是终止应用程序。
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.PrintError(fmt.Errorf("%s", err), nil)
+			}
+		}()
 		// 调用邮件发送器的 Send() 方法，传入用户的电子邮件地址、模板文件名称和包含新用户数据的 User 结构。
 		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
 		if err != nil {
