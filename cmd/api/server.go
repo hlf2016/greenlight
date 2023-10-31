@@ -58,8 +58,22 @@ func (app *application) serve() error {
 
 		// 以 0（成功）状态码退出应用程序。
 		// os.Exit(0)
-		// 将 shutdown 操作信息放入 shutdownError channel 中
-		shutdownError <- srv.Shutdown(ctx)
+		// 将 shutdown 操作成功与否的信息放入 shutdownError channel 中
+		// shutdownError <- srv.Shutdown(ctx)
+
+		// 像以前一样在服务器上调用 Shutdown()，但现在只有在返回错误时才会发送到 shutdownError 频道。
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+		// 记录一条信息，说明我们正在等待后台程序完成任务。
+		app.logger.PrintInfo("completing background tasks", map[string]string{
+			"addr": srv.Addr,
+		})
+
+		// 调用 Wait() 进行阻塞，直到我们的 WaitGroup 计数器为零 -- 本质上就是阻塞，直到后台程序结束。然后，我们在 shutdownError 频道上返回 nil，表示关机顺利完成
+		app.wg.Wait()
+		shutdownError <- nil
 	}()
 
 	app.logger.PrintInfo("starting server", map[string]string{

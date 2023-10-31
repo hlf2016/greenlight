@@ -9,6 +9,7 @@ import (
 	"greenlight.311102.xyz/internal/jsonlog"
 	"greenlight.311102.xyz/internal/mailer"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -43,6 +44,7 @@ type application struct {
 	logger *jsonlog.Logger // 将日志记录器字段改为 *jsonlog.Logger 类型，而不是 log.Logger。
 	models data.Models
 	mailer mailer.Mailer
+	wg     sync.WaitGroup // 在应用程序结构体中加入 sync.WaitGroup。sync.WaitGroup 类型的零值是一个有效的、可使用的、"计数器 "值为 0 的 sync.WaitGroup，因此我们在使用它之前不需要做任何其他初始化操作。
 }
 
 func main() {

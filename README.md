@@ -219,4 +219,47 @@ curl -d "$BODY" localhost:4000/v1/users
 - 您可以在一条指令中指定多个目录和文件。例如： go:embed "images" "styles/css" "favicon.ico" .
 - 路径分隔符应始终为正斜线 / ，即使在 Windows 机器上也是如此。
 
+## 优雅关闭后台任务
+我们可以使用 Go 的 sync.WaitGroup 功能来协调优雅关机和后台程序。
+> 当你想等待一组 goroutines 完成它们的工作时，主要的辅助工具是 sync.WaitGroup 类型
+> 
+> 它的工作方式在概念上有点像 "计数器"。每次启动后台程序时，你都可以将计数器递增 1，当每个后台程序结束时，你再将计数器递减 1。 然后你就可以监控计数器，当计数器等于零时，你就知道所有后台程序都已结束。
 
+```go
+package main
+import (
+    "fmt"
+    "sync"
+)
+func main() {
+    // Declare a new WaitGroup.
+    var wg sync.WaitGroup
+    // Execute a loop 5 times.
+    for i := 1; i <= 5; i++ {
+        // Increment the WaitGroup counter by 1, BEFORE we launch the background routine.
+        wg.Add(1)
+        // Launch the background goroutine.
+        go func() {
+            // Defer a call to wg.Done() to indicate that the background goroutine has
+            // completed when this function returns. Behind the scenes this decrements
+            // the WaitGroup counter by 1 and is the same as writing wg.Add(-1).
+            defer wg.Done()
+            fmt.Println("hello from a goroutine")
+        }()
+    }
+    // Wait() blocks until the WaitGroup counter is zero --- essentially blocking until all
+    // goroutines have completed.
+    wg.Wait()
+    fmt.Println("all goroutines finished")
+}
+```
+outputs
+```shell
+hello from a goroutine
+hello from a goroutine
+hello from a goroutine
+hello from a goroutine
+hello from a goroutine
+all goroutines finished
+```
+> 这里需要强调的一点是，我们在启动后台程序之前立即用 wg.Add(1) 增加计数器。如果我们在后台程序中调用 wg.Add(1)，就会出现竞赛条件，因为 wg.Wait() 有可能在计数器递增之前被调用。

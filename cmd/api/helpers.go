@@ -146,7 +146,11 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 
 // background() 辅助函数接受一个任意函数作为参数， recover后台程序中的 panic 错误
 func (app *application) background(fn func()) {
+	// 递增 WaitGroup 计数器。
+	app.wg.Add(1)
 	go func() {
+		// 使用 defer 可以在 goroutine 返回之前递减 WaitGroup 计数器。
+		defer app.wg.Done()
 		// 运行一个延迟函数，使用 recover() 来捕捉任何恐慌，并记录错误信息，而不是终止应用程序。
 		defer func() {
 			if err := recover(); err != nil {
