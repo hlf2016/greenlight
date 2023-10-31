@@ -143,3 +143,17 @@ func (app *application) readInt(qs url.Values, key string, defaultValue int, v *
 	}
 	return i
 }
+
+// background() 辅助函数接受一个任意函数作为参数， recover后台程序中的 panic 错误
+func (app *application) background(fn func()) {
+	go func() {
+		// 运行一个延迟函数，使用 recover() 来捕捉任何恐慌，并记录错误信息，而不是终止应用程序。
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.PrintError(fmt.Errorf("%s", err), nil)
+			}
+		}()
+		// 执行我们作为参数传递的任意函数。
+		fn()
+	}()
+}
