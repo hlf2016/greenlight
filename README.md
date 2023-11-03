@@ -263,3 +263,9 @@ hello from a goroutine
 all goroutines finished
 ```
 > 这里需要强调的一点是，我们在启动后台程序之前立即用 wg.Add(1) 增加计数器。如果我们在后台程序中调用 wg.Add(1)，就会出现竞赛条件，因为 wg.Wait() 有可能在计数器递增之前被调用。
+
+## math/rand 和 crypto/rand 区别
+Go 还有一个 math/rand 软件包，它提供了一个确定性伪随机数生成器（PRNG）。
+> 重要的是，千万不要将 math/rand 包用于任何需要加密安全的用途，例如像我们这里这样生成令牌或秘密。
+
+事实上，可以说最好使用 crypto/rand 作为标准做法。只有在特定情况下，即确定性 PRNG 是可以接受的，并且迫切需要更快的 math/rand 性能时，才会选择使用 math/rand。
