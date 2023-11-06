@@ -21,6 +21,7 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
 	router.HandlerFunc(http.MethodGet, "/v1/movies", app.listMoviesHandler)
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)
+	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 
 	// 用 panic 恢复中间件包裹路由器。
 	return app.recoverPanic(app.rateLimit(router))

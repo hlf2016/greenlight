@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"golang.org/x/crypto/bcrypt"
@@ -177,4 +178,50 @@ func (m UserModel) Update(user *User) error {
 		}
 	}
 	return nil
+}
+
+func (m UserModel) GetForToken(tokenScope, tokenPlaintext string) (*User, error) {
+	// 计算客户端提供的明文令牌的 SHA-256 哈希值。请记住，返回的是长度为 32 的字节数组，而不是片段。
+	tokenHash := sha256.Sum256([]byte(tokenPlaintext))
+
+	query := `
+	SELECT users.id, users.created_at, users.name, users.email, users.password_hash, users.activated, users.version
+	FROM users
+	INNER JOIN tokens
+	ON users.id = tokens.user_id
+	WHERE tokens.hash = $1
+	AND tokens.scope = $2
+	AND tokens.expiry > $3
+	`
+
+	// 创建一个包含查询参数的片段。
+	// 请注意我们是如何使用 [:] 操作符来获取包含令牌散列的slice，而不是传递数组（pq 驱动程序不支持数组），而且我们还传递了当前时间作为检查令牌到期的值。
+	args := []any{tokenHash[:], tokenScope, time.Now()}
+
+	var user User
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// 执行查询，将返回值扫描到 User 结构中。如果没有找到匹配记录，我们将返回 ErrRecordNotFound 错误。
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(
+		&user.ID,
+		&user.CreatedAt,
+		&user.Name,
+		&user.Email,
+		&user.Password.hash,
+		&user.Activated,
+		&user.Version,
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return nil, ErrRecordNotFound
+		default:
+			return nil, err
+		}
+	}
+
+	return &user, nil
 }
