@@ -12,16 +12,17 @@ import (
 
 // ScopeActivation 定义 token scope 的常量。现在，我们只定义作用域 “ activation ”，但我们将在本书后面添加其他作用域。
 var (
-	ScopeActivation = "activation"
+	ScopeActivation     = "activation"
+	ScopeAuthentication = "authentication"
 )
 
 // Token 定义一个令牌结构，用于保存单个令牌的数据。其中包括令牌的明文和散列版本、相关用户 ID、过期时间和范围。
 type Token struct {
-	Plaintext string
-	Hash      []byte
-	UserID    int64
-	Expiry    time.Time
-	Scope     string
+	Plaintext string    `json:"token"`
+	Hash      []byte    `json:"-"`
+	UserID    int64     `json:"-"`
+	Expiry    time.Time `json:"expiry"`
+	Scope     string    `json:"-"`
 }
 
 func generateToken(userID int64, ttl time.Duration, scope string) (*Token, error) {

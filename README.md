@@ -269,3 +269,37 @@ Go 还有一个 math/rand 软件包，它提供了一个确定性伪随机数生
 > 重要的是，千万不要将 math/rand 包用于任何需要加密安全的用途，例如像我们这里这样生成令牌或秘密。
 
 事实上，可以说最好使用 crypto/rand 作为标准做法。只有在特定情况下，即确定性 PRNG 是可以接受的，并且迫切需要更快的 math/rand 性能时，才会选择使用 math/rand。
+
+##  身份验证和授权
+> **Remember**: Authentication is about confirming who a user is, whereas authorization is
+about checking whether that user is permitted to do something.
+
+> 身份验证是关于确认用户是谁，而授权是关于检查该用户是否被允许执行某些操作
+
+### 身份验证选项
+- HTTP 基本认证
+> 使用这种方法时，客户端会在每个请求中包含一个授权头，其中包含他们的凭据。凭据的格式为 username:password 和 base-64 编码。例如，要以 alice@example.com:pa55word 身份进行身份验证，客户端将发送以下头信息：
+>Authorization: Basic YWxpY2VAZXhhbXBsZS5jb206cGE1NXdvcmQ=
+
+在您的应用程序接口中，您可以使用 Go 的 `Request.BasicAuth()` 方法从该标头中提取凭据，并在继续处理请求之前验证它们是否正确。
+
+- Token 验证
+  - 有状态token
+    > 在有状态令牌方法中，令牌的值是一个高熵加密安全随机字符串。这个令牌或其快速散列值与用户 ID 和令牌的到期时间一起存储在服务器端的数据库中。
+    
+    如 session 方式
+
+  - 无状态token
+    > 相比之下，无状态令牌将用户 ID 和过期时间编码在令牌本身中。令牌经过加密签名以防篡改，并（在某些情况下）进行加密以防内容被读取。
+    
+    如 jwt token
+- API-key 身份验证
+  > API 密钥身份验证背后的理念是，用户拥有与其账户相关联的非过期秘密 "密钥"。这个密钥应该是一个高熵加密安全随机字符串，密钥的快速散列（SHA256 或 SHA512）应该与相应的用户 ID 一起存储在数据库中。然后，用户每次向 API 请求时，都会在类似这样的标头中传递他们的密钥: Authorization: Key <key>
+
+  从概念上讲，这与 `有状态Token` 方法相差无几，主要区别在于**密钥是永久密钥，而不是临时令牌**。
+- OAuth 2.0 OpenID Connect
+  > 另一种方法是利用 OAuth 2.0 进行身份验证。使用这种方法，用户的信息（及其密码）将由第三方身份提供商（如 Google 或 Facebook）而不是你自己来存储。
+
+  https://github.com/coreos/go-oidc
+
+
