@@ -302,4 +302,8 @@ about checking whether that user is permitted to do something.
 
   https://github.com/coreos/go-oidc
 
+## 读取和写入请求上下文
+- 我们的应用程序处理的每个 http.Request 都嵌入了一个 context.Context，我们可以用它来存储请求生命周期内包含任意数据的键/值对。在本例中，我们要存储一个包含当前用户信息的 User 结构。
+- 存储在请求上下文中的任何值的类型都是 any。这意味着从请求上下文中获取值后，需要在使用前将其恢复为原始类型。
+- 为请求上下文键使用自己的自定义类型是一种很好的做法。这有助于防止代码与同样使用请求上下文存储信息的第三方软件包之间发生命名冲突。
 

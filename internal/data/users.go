@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// AnonymousUser 声明一个新的匿名用户变量。
+// 因此，我们在这里创建了一个新的 AnonymousUser 变量，它包含一个指向 User 结构的指针，代表一个没有 ID、姓名、电子邮件或密码的未激活用户。
+var AnonymousUser = &User{}
+
 var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
@@ -19,6 +23,11 @@ var (
 type password struct {
 	plaintext *string
 	hash      []byte
+}
+
+// 检查用户实例是否为匿名用户。
+func (u *User) isAnonymous() bool {
+	return u == AnonymousUser
 }
 
 // User 定义一个 User 结构来表示单个用户。

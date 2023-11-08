@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"golang.org/x/time/rate"
+	"greenlight.311102.xyz/internal/data"
+	"greenlight.311102.xyz/internal/validator"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -97,6 +101,59 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			// 请注意，我们不能使用 defer 来解锁互斥，因为这意味着在该中间件下游的所有处理程序都返回之前，互斥不会被解锁。
 			mu.Unlock()
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 将 "Vary：授权 "标头。这将向任何缓存表明，响应可能会根据请求中的 "授权"(Authorization) 标头的值而有所不同。
+		w.Header().Add("Vary", "Authorization")
+		// 从请求中读取授权标头的值。如果找不到授权标头，将返回空字符串""。
+		authorizationHeader := r.Header.Get("Authorization")
+
+		// 如果没有找到授权头，则使用我们刚刚制作的 contextSetUser() 辅助函数将匿名用户添加到请求上下文中。然后，我们调用链中的下一个处理程序并返回，不执行下面的任何代码。
+		if authorizationHeader == "" {
+			app.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// 否则，我们希望授权头的值格式为 "Bearer <token>"。我们会尝试将其拆分成几个部分，如果头信息不符合预期格式，
+		// 我们就会使用 invalidAuthenticationTokenResponse() 辅助程序（稍后将创建）返回 401 Unauthorized 响应。
+		authParts := strings.Split(authorizationHeader, " ")
+		if len(authParts) != 2 || authParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// 从标头部分提取实际的身份验证令牌。
+		token := authParts[1]
+		// 验证令牌，确保其格式合理。
+		v := validator.New()
+		// 如果令牌无效，则使用 invalidAuthenticationTokenResponse() 辅助程序发送响应，
+		// 而不是我们通常使用的 failedValidationResponse() 辅助程序。
+		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// 读取与身份验证令牌关联的用户的详细信息，如果没有找到匹配记录，则再次调用 invalidAuthenticationTokenResponse() 辅助程序。
+		// 重要：请注意，我们在这里使用 ScopeAuthentication 作为第一个参数。
+		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+
+		// 调用 contextSetUser() 辅助函数将用户信息添加到请求上下文中。
+		app.contextSetUser(r, user)
+
 		next.ServeHTTP(w, r)
 	})
 }

@@ -66,3 +66,11 @@ func (app *application) invalidCredentialsResponse(w http.ResponseWriter, r *htt
 	message := "invalid authentication credentials"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
+
+func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter, r *http.Request) {
+	// 我们在这里加入了 WWW-Authenticate.Bearer 头信息：承载头，以帮助通知或提醒客户端我们希望他们使用承载令牌进行身份验证。
+	w.Header().Set("WWW-Authenticate", "Bearer")
+
+	message := "invalid or missing authentication token"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
