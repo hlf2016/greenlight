@@ -25,8 +25,8 @@ type password struct {
 	hash      []byte
 }
 
-// 检查用户实例是否为匿名用户。
-func (u *User) isAnonymous() bool {
+// IsAnonymous 检查用户实例是否为匿名用户。
+func (u *User) IsAnonymous() bool {
 	return u == AnonymousUser
 }
 

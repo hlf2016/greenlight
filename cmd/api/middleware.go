@@ -114,7 +114,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		// 如果没有找到授权头，则使用我们刚刚制作的 contextSetUser() 辅助函数将匿名用户添加到请求上下文中。然后，我们调用链中的下一个处理程序并返回，不执行下面的任何代码。
 		if authorizationHeader == "" {
-			app.contextSetUser(r, data.AnonymousUser)
+			r = app.contextSetUser(r, data.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -152,7 +152,27 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		}
 
 		// 调用 contextSetUser() 辅助函数将用户信息添加到请求上下文中。
-		app.contextSetUser(r, user)
+		r = app.contextSetUser(r, user)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// 请注意，我们的 requireActivatedUser() 中间件的签名与我们在本书中构建的其他中间件略有不同。它不是接受并返回一个 http.Handler，而是接受并返回一个 http.HandlerFunc。
+// 这只是一个很小的改动，但它使得我们可以直接用这个中间件来封装我们的 v1/movie** 处理程序函数，而无需进行任何进一步的转换。
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
 
 		next.ServeHTTP(w, r)
 	})
