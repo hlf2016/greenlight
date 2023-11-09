@@ -309,3 +309,26 @@ about checking whether that user is permitted to do something.
 
 > 当认证缺失或认证错误时，应使用 401 Unauthorized 响应；当用户已通过认证但不允许执行请求的操作时，应随后使用 403 Forbidden 响应。
 
+## permissions 测试数据填充
+```postgresql
+-- Set the activated field for alice@example.com to true.
+UPDATE users SET activated = true WHERE email = 'alice@example.com';
+-- Give all users the 'movies:read' permission
+INSERT INTO users_permissions
+SELECT id, (SELECT id FROM permissions WHERE code = 'movies:read') FROM users;
+-- Give faith@example.com the 'movies:write' permission
+INSERT INTO users_permissions
+VALUES (
+(SELECT id FROM users WHERE email = 'faith@example.com'),
+(SELECT id FROM permissions WHERE code = 'movies:write')
+);
+-- List all activated users and their permissions.
+SELECT email, array_agg(permissions.code) as permissions
+FROM permissions
+INNER JOIN users_permissions ON users_permissions.permission_id = permissions.id
+INNER JOIN users ON users_permissions.user_id = users.id
+WHERE users.activated = true
+GROUP BY email;
+```
+> **注意**：在最后的 SQL 查询中，我们使用了聚合函数 array_agg()和 GROUP BY 子句，以数组形式输出与每个电子邮件地址相关的权限。
+
