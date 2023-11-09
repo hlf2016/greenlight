@@ -158,9 +158,9 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 	})
 }
 
-// 请注意，我们的 requireActivatedUser() 中间件的签名与我们在本书中构建的其他中间件略有不同。它不是接受并返回一个 http.Handler，而是接受并返回一个 http.HandlerFunc。
+// 请注意，我们的 requireAuthenticatedUser requireActivatedUser() 中间件的签名与我们在本书中构建的其他中间件略有不同。它不是接受并返回一个 http.Handler，而是接受并返回一个 http.HandlerFunc。
 // 这只是一个很小的改动，但它使得我们可以直接用这个中间件来封装我们的 v1/movie** 处理程序函数，而无需进行任何进一步的转换。
-func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := app.contextGetUser(r)
 
@@ -169,6 +169,15 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 			return
 		}
 
+		next.ServeHTTP(w, r)
+
+	})
+}
+
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
 		if !user.Activated {
 			app.inactiveAccountResponse(w, r)
 			return
@@ -176,4 +185,6 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 
 		next.ServeHTTP(w, r)
 	})
+	// 在返回 fn 之前，用 requireAuthenticatedUser() 中间件对其进行封装。
+	return app.requireAuthenticatedUser(fn)
 }
