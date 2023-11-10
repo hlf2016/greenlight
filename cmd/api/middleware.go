@@ -212,7 +212,23 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 
 func (app *application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		// 告知客户端 响应根据Origin值不同会有变化
+		w.Header().Set("Vary", "Origin")
+
+		origin := r.Header.Get("Origin")
+
+		// w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		if origin != "" {
+			// 在受信任的来源列表中循环，检查请求的来源是否与其中之一完全匹配。如果没有受信任的来源地，则不会迭代循环
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+					// 如果匹配，则设置一个以请求来源为值的 "Access-Control-Allow-Origin "响应头，然后跳出循环。
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }

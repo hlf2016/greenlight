@@ -345,3 +345,6 @@ GROUP BY email;
 
 > 需要强调的是，同源策略并不阻止跨源发送数据，尽管这也很危险。事实上，这就是 CSRF 攻击可能发生的原因，也是我们需要采取额外措施来防止它们的原因，比如使用 SameSite cookie 和 CSRF 标记。
 
+### origin 为 null
+> 切勿在安全列表中将 "null "值作为可信来源。这是因为攻击者可以通过从沙盒 iframe 发送请求来伪造请求标头 Origin: null。
+[sandboxed iframe](https://stackoverflow.com/questions/44764338/origin-header-null-for-xhr-request-made-from-iframe-with-sandbox-attribute/44765536#44765536)

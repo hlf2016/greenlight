@@ -9,6 +9,7 @@ import (
 	"greenlight.311102.xyz/internal/jsonlog"
 	"greenlight.311102.xyz/internal/mailer"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,6 +37,9 @@ type config struct {
 		username string
 		password string
 		sender   string
+	}
+	cors struct {
+		trustedOrigins []string
 	}
 }
 
@@ -71,6 +75,14 @@ func main() {
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "1e2b246389e036", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "e5bba5ecf0f339", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@greenlight.alexedwards.net>", "SMTP sender")
+
+	// 使用 flag.Func() 函数处理 -cors-trusted-origins 命令行标志。
+	// 在此过程中，我们使用 strings.Fields() 函数根据空白字符将标志值分割成片段，并将其赋值给配置结构。
+	// 重要的是，如果 -cors-trusted-origins 标记不存在、包含空字符串或仅包含空白字符，那么 strings.Fields() 将返回一个空的[]字符串片段。
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
 
 	flag.Parse()
 
