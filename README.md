@@ -381,4 +381,40 @@ xhr.send(null);
 
 当跨源请求不符合这些条件时，网络浏览器会在真正请求之前触发一个初始 "预检 "请求。预检请求的目的是确定是否允许真正的跨源请求。
 
+#### 缓存预检响应
+如果需要，还可以在预检响应中添加 Access-Control-Max-Age 标头。
+这表示浏览器可以缓存 Access-Control-Allow-Methods 和 Access-Control-Allow-Headers 头信息的秒数。
+例如，如果要将这些值缓存 60 秒，可以在预检响应中设置以下标头：
+```
+Access-Control-Max-Age: 60
+```
+如果不设置 Access-Control-Max-Age 标头，当前版本的 Chrome/Chromium 和 Firefox 将默认缓存这些预检响应值 5 秒钟。
+旧版本或其他浏览器可能有不同的默认值，或者根本不缓存这些值。
 
+设置较长的 Access-Control-Max-Age 持续时间似乎是减少对 API 请求的一种有效方法，事实也确实如此！
+但你也需要小心。并非所有浏览器都提供了清除预检缓存的方法，因此如果您发回了错误的标头，用户就会一直使用这些标头，直到缓存过期。
+
+如果想完全禁用缓存，可以将值设为-1：
+```
+Access-Control-Max-Age: -1
+```
+
+同样重要的是要注意，浏览器可能会硬性规定标头缓存的最长时间。MDN 文档指出:
+>- Firefox caps this at 24 hours(86400 seconds).
+>- Chromium (prior to v76) caps at 10 minutes(600 seconds).
+>- Chromium (starting in v76) caps at 2 hours(7200 seconds).
+
+#### 预检请求通配符
+如果您有一个复杂或快速变化的 API，那么为预检响应维护一个硬编码的方法和标头安全列表可能会很麻烦。
+你可能会想：我只想允许跨源请求使用所有 HTTP 方法和头信息。
+
+在这种情况下，Access-Control-Allow-Methods（访问控制允许的方法）和 Access-Control-Allow-Headers （访问控制允许的头信息）头信息都允许你使用 `*` 通配符，如图所示：
+```
+Access-Control-Allow-Methods: *
+Access-Control-Allow-Headers: *
+```
+
+不过，使用时也有一些重要的注意事项：
+- 目前只有 74% 的浏览器支持这些标头中的通配符。任何不支持通配符的浏览器都会阻止预检请求。
+- Authorization 头不能通配符。取而代之的是，你需要在头信息中明确包含这一点，如 `Access-Control-Allow-Headers: Authorization, *` 
+- 通配符不支持认证请求（带 Cookie 或 HTTP 基本认证的请求）。对于这些请求，字符将被视为字面字符串 "*"，而不是通配符。
