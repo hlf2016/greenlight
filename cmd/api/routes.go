@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"github.com/julienschmidt/httprouter"
 	"net/http"
 )
@@ -26,6 +27,9 @@ func (app *application) routes() http.Handler {
 	router.HandlerFunc(http.MethodPut, "/v1/users/activated", app.activateUserHandler)
 
 	router.HandlerFunc(http.MethodPost, "/v1/tokens/authentication", app.createAuthenticationHandler)
+
+	// 注册指向 expvar 处理程序的新 GET v1/metrics 端点。
+	router.Handler(http.MethodGet, "/v1/metrics", expvar.Handler())
 
 	// 用 panic 恢复中间件包裹路由器。
 	// 这里需要指出的是，enableCORS() 中间件是特意放在中间件链的早期位置的。

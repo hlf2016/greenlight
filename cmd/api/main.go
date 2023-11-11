@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	_ "github.com/lib/pq"
 	"greenlight.311102.xyz/internal/data"
@@ -103,6 +104,8 @@ func main() {
 
 	logger.PrintInfo("database connection pool established", nil)
 
+	// 在 expvar 处理程序中发布一个新的 "版本 "变量，其中包含应用程序的版本号（目前为常量 "1.0.0"）。
+	expvar.NewString("version").Set(version)
 	// 使用 data.NewModels() 函数初始化一个 Models 结构，并将连接池作为参数传递。
 	app := &application{
 		config: cfg,
