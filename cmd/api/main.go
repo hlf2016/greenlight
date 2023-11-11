@@ -10,6 +10,7 @@ import (
 	"greenlight.311102.xyz/internal/jsonlog"
 	"greenlight.311102.xyz/internal/mailer"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -106,6 +107,15 @@ func main() {
 
 	// 在 expvar 处理程序中发布一个新的 "版本 "变量，其中包含应用程序的版本号（目前为常量 "1.0.0"）。
 	expvar.NewString("version").Set(version)
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+	expvar.Publish("db", expvar.Func(func() any {
+		return db.Stats()
+	}))
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 	// 使用 data.NewModels() 函数初始化一个 Models 结构，并将连接池作为参数传递。
 	app := &application{
 		config: cfg,
