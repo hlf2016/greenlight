@@ -348,3 +348,37 @@ GROUP BY email;
 ### origin 为 null
 > 切勿在安全列表中将 "null "值作为可信来源。这是因为攻击者可以通过从沙盒 iframe 发送请求来伪造请求标头 Origin: null。
 [sandboxed iframe](https://stackoverflow.com/questions/44764338/origin-header-null-for-xhr-request-made-from-iframe-with-sandbox-attribute/44765536#44765536)
+
+### 身份验证和 CORS
+如果您的 API 端点需要凭证（cookie 或 HTTP 基本身份验证），您还应在响应中设置 Access-Control-Allow-Credentials: true 标头。如果不设置此标头，网络浏览器就会阻止 JavaScript 读取任何带有凭据的跨源响应。
+
+重要的是，您绝不能将通配符 Access-Control-Allow-Origin:* 标头与 Access-Control-Allow-Credentials: true 结合使用，因为这将允许任何网站向您的 API 提出带凭证的跨源请求。
+
+另外，重要的是，如果您希望在发送跨源请求时发送凭证，那么您需要在 JavaScript 中明确指定这一点。例如，在使用 fetch() 时，应将请求的凭据值设置为 "include"
+
+```javascript
+fetch("https://api.example.com", {credentials: 'include'}).then( ... );
+```
+或者，如果使用 XMLHTTPRequest，则应将 withCredentials 属性设置为 true。例如
+```javascript
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'https://api.example.com');
+xhr.withCredentials = true;
+xhr.send(null);
+```
+### 预检CORS请求
+当满足以下所有条件时，跨源请求被归类为 "简单 "请求：
+- 请求 HTTP 方法是三种 CORS 安全方法之一：HEAD、GET 或 POST。
+- 请求标头均为[禁止标头](https://developer.mozilla.org/en-US/docs/Glossary/Forbidden_header_name)或四种 CORS 安全标头之一：
+  - Accept
+  - Accept-Language
+  - Content-Language
+  - Content-Type
+- Content-Type 标头（如果设置）的值为以下之一
+  - application/x-www-form-urlencoded
+  - multipart/form-data
+  - text/plain
+
+当跨源请求不符合这些条件时，网络浏览器会在真正请求之前触发一个初始 "预检 "请求。预检请求的目的是确定是否允许真正的跨源请求。
+
+

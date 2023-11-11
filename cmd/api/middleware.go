@@ -212,8 +212,10 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 
 func (app *application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 告知客户端 响应根据Origin值不同会有变化
-		w.Header().Set("Vary", "Origin")
+		// 告知请求客户端 响应根据Origin值不同会有变化
+		w.Header().Add("Vary", "Origin")
+		// 告知请求客户端 响应根据Access-Control-Request-Method值不同会有变化
+		w.Header().Add("Vary", "Access-Control-Request-Method")
 
 		origin := r.Header.Get("Origin")
 
@@ -225,6 +227,20 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 				if origin == app.config.cors.trustedOrigins[i] {
 					// 如果匹配，则设置一个以请求来源为值的 "Access-Control-Allow-Origin "响应头，然后跳出循环。
 					w.Header().Set("Access-Control-Allow-Origin", origin)
+					// 检查请求是否具有 HTTP 方法 OPTIONS 并包含 "Access-Control-Request-Method"（访问控制请求方法）标头。如果是，我们就将其视为预检请求。
+					// 响应预检请求时，无需在 Access-Control-Allow-Methods 头信息中包含 CORS 安全方法 HEAD、GET 或 POST。同样，也没有必要在 Access-Control-Allow-Headers 中包含禁止或 CORS 安全标头。
+					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+						// 如前所述，设置必要的预检响应标头
+						w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+
+						// 如果允许在跨起源请求中使用 "授权"(Authorization) 标头，就像我们在上面的代码中所做的那样，那么重要的是不要设置通配符 "Access-Control-Allow-Origin: *"标头，也不要在未与受信任的起源列表进行核对的情况下反映起源标头。否则，您的服务就很容易受到针对该标头中传递的任何身份验证凭据的分布式暴力破解攻击。
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+						// 写入标头和 200 OK 状态，然后从中间件返回，不做进一步操作
+						// 在响应预检请求时，我们会特意发送 HTTP 状态 200 OK，而不是 204 No Content，即使没有响应正文。这是因为某些浏览器版本可能不支持 204 No Content 响应，因此会阻止真正的请求。
+						w.WriteHeader(http.StatusOK)
+						return
+					}
 					break
 				}
 			}
