@@ -418,3 +418,48 @@ Access-Control-Allow-Headers: *
 - 目前只有 74% 的浏览器支持这些标头中的通配符。任何不支持通配符的浏览器都会阻止预检请求。
 - Authorization 头不能通配符。取而代之的是，你需要在头信息中明确包含这一点，如 `Access-Control-Allow-Headers: Authorization, *` 
 - 通配符不支持认证请求（带 Cookie 或 HTTP 基本认证的请求）。对于这些请求，字符将被视为字面字符串 "*"，而不是通配符。
+
+## metrics 中间件另一种写法--嵌入式 http.ResponseWriter
+如果你愿意，可以更改 metricsResponseWriter 结构，使其嵌入 http.ResponseWriter 而不是封装它。就像这样:
+```go
+type metricsResponseWriter struct {
+  http.ResponseWriter
+  statusCode int
+  headerWritten bool
+}
+func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
+  mw.ResponseWriter.WriteHeader(statusCode)
+  if !mw.headerWritten {
+    mw.statusCode = statusCode
+    mw.headerWritten = true
+  }
+}
+func (mw *metricsResponseWriter) Write(b []byte) (int, error) {
+  if !mw.headerWritten {
+    mw.statusCode = http.StatusOK
+    mw.headerWritten = true
+  }
+  return mw.ResponseWriter.Write(b)
+}
+func (mw *metricsResponseWriter) Unwrap() http.ResponseWriter {
+    return mw.ResponseWriter
+}
+...
+mw := &metricsResponseWriter{ResponseWriter: w}
+next.ServeHTTP(mw, r)
+```
+这样做的最终结果与原始方法相同。不过，这样做的好处是，你不需要为 metricsResponseWriter 结构编写 Header() 方法（它会从嵌入式 http.ResponseWriter 自动升级）。至少在我看来，这样做的损失是不如使用封装字段来得清晰明确。无论哪种方法都可以，关键是看你喜欢哪一种。
+
+## make && Makefile
+请注意，makefile 规则中的每条命令必须以 `Tab` 开头，而**不是空格**。
+
+> 需要指出的一点是，默认情况下，make 会在终端输出中 echo 命令。我们可以在上面的代码中看到，输出的第一行就是 echo 命令 go run ./cmd/api 。
+> 如果需要，可以在命令前加上 @ 字符，以阻止命令被 echo。
+
+### 环境变量的使用
+当我们执行 make 规则时，make 启动时可用的每个环境变量都会转化为具有相同名称和值的 make 变量。
+然后，我们可以在 makefile 中使用 ${VARIABLE_NAME} 语法访问这些变量。
+
+### 传参数
+访问命名参数值的语法与访问环境变量的语法完全相同。因此，在上面的例子中，我们可以通过 makefile 中的 ${name} 访问迁移文件名。
+> makefile 中的变量名区分大小写，因此 foo、FOO 和 Foo 都指代不同的变量。make 文档建议，对于只在 makefile 中起内部作用的变量名，应使用小写字母，否则应使用大写变量名。
