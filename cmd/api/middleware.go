@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
 	"golang.org/x/time/rate"
 	"greenlight.311102.xyz/internal/data"
@@ -246,5 +247,33 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 			}
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) metrics(next http.Handler) http.Handler {
+	// 在首次构建中间件链时初始化新的 expvar 变量。
+	var (
+		totalRequestsReceived           = expvar.NewInt("total_requests_received")
+		totalResponsesSent              = expvar.NewInt("total_responses_sent")
+		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
+	)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 记录我们开始处理申请的时间。
+		start := time.Now()
+		// 使用 Add() 方法将收到的请求数增加 1。
+		totalRequestsReceived.Add(1)
+
+		next.ServeHTTP(w, r)
+
+		// 在返回中间件链的途中，将发送的响应数递增 1
+		totalResponsesSent.Add(1)
+
+		// 计算我们开始处理请求后的微秒数，然后将总处理时间按此数递增。
+		duration := time.Since(start).Microseconds()
+		totalProcessingTimeMicroseconds.Add(duration)
+
+		// 在 /v1/metrics 下看到的 json 数据中 totalResponsesSent 总比 totalRequestsReceived 小 1
+		// 这是因为 totalRequestsReceived.Add 是在 返回 json 之前被访问到  而 totalResponsesSent.Add 则总是在 json 返回之后才被访问到
 	})
 }

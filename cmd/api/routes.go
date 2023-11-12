@@ -35,5 +35,5 @@ func (app *application) routes() http.Handler {
 	// 这里需要指出的是，enableCORS() 中间件是特意放在中间件链的早期位置的。
 	// 举例来说，如果我们把它放在速率限制器之后，任何超过速率限制的跨源请求都不会有 Access-Control-Allow-Origin 标头集。
 	// 这就意味着客户端的网络浏览器会根据同源策略阻止这些请求，而不是让客户端收到 429 太多请求（Too Many Requests）的响应。
-	return app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router))))
+	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router)))))
 }
