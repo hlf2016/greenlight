@@ -9,6 +9,7 @@ import (
 	"greenlight.311102.xyz/internal/validator"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -250,12 +251,57 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 	})
 }
 
+// 实现自己的 http.ResponseWriter
+
+// metricsResponseWriter 封装了现有的 http.ResponseWriter，还包含一个用于记录响应状态代码的字段和一个布尔标志，用于指示是否已写入响应头。
+// 重要的是，我们的 metricsResponseWriter 类型满足 http.ResponseWriter 接口的要求。它拥有具有相应签名的 Header()、WriteHeader() 和 Write() 方法，因此我们可以在处理程序中正常使用它。
+type metricsResponseWriter struct {
+	wrapped       http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+// Header 方法是对封装后的 http.ResponseWriter 的 Header() 方法的简单 "传递"。
+func (mw *metricsResponseWriter) Header() http.Header {
+	return mw.wrapped.Header()
+}
+
+// WriteHeader 同样，WriteHeader() 方法会 "穿过 "封装的 http.ResponseWriter 的 WriteHeader() 方法。但在返回后，我们还会记录响应状态代码（如果尚未记录的话）。
+func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
+	mw.wrapped.WriteHeader(statusCode)
+	// 此外，请注意我们在 WriteHeader() 方法中的 "直通 "调用之后才记录状态代码。
+	// 这是因为该操作中的恐慌（可能是由于状态代码无效）可能意味着最终会向客户端发送不同的状态代码。
+	if !mw.headerWritten {
+		mw.statusCode = statusCode
+		mw.headerWritten = true
+	}
+}
+
+// Write 同样，Write() 方法会 "传递 "到封装的 http.ResponseWriter 的 Write() 方法。
+// 如果没有单独成功调用 WriteHeader()，我们知道 Go 将默认使用响应状态 200 OK，所以我们记录了以下内容
+func (mw *metricsResponseWriter) Write(b []byte) (int, error) {
+	if !mw.headerWritten {
+		mw.statusCode = http.StatusOK
+		mw.headerWritten = true
+	}
+	return mw.wrapped.Write(b)
+}
+
+// Unwrap  我们还需要一个 Unwrap() 方法，用于返回现有的封装 http.ResponseWriter
+func (mw *metricsResponseWriter) Unwrap() http.ResponseWriter {
+	return mw.wrapped
+}
+
 func (app *application) metrics(next http.Handler) http.Handler {
 	// 在首次构建中间件链时初始化新的 expvar 变量。
 	var (
 		totalRequestsReceived           = expvar.NewInt("total_requests_received")
 		totalResponsesSent              = expvar.NewInt("total_responses_sent")
 		totalProcessingTimeMicroseconds = expvar.NewInt("total_processing_time_μs")
+		totalActiveRequests             = expvar.NewInt("total_active_requests")
+
+		// 声明一个新的 expvar 映射，用于保存每个 HTTP 状态代码的响应计数。
+		totalResponsesSentByStatus = expvar.NewMap("total_responses_sent_by_status")
 	)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -264,16 +310,26 @@ func (app *application) metrics(next http.Handler) http.Handler {
 		// 使用 Add() 方法将收到的请求数增加 1。
 		totalRequestsReceived.Add(1)
 
-		next.ServeHTTP(w, r)
+		totalActiveRequests.Set(totalRequestsReceived.Value() - totalResponsesSent.Value())
+
+		// 创建一个新的 metricsResponseWriter，它封装了metrics中间件收到的原始 http.ResponseWriter 值。
+		mw := &metricsResponseWriter{wrapped: w}
+		// 使用新的 metricsResponseWriter 作为 http.ResponseWriter 值，调用链中的下一个处理程序。x
+		next.ServeHTTP(mw, r)
 
 		// 在返回中间件链的途中，将发送的响应数递增 1
 		totalResponsesSent.Add(1)
+
+		// 此时，响应状态代码应存储在 mw.statusCode 字段中。
+		// 请注意，expvar 映射是以字符串为键的，因此我们需要使用 strconv.Itoa() 函数将状态代码（整数）转换为字符串。
+		// 然后，我们在新的 totalResponsesSentByStatus 映射上使用 Add() 方法，将给定状态代码的计数递增 1。
+		totalResponsesSentByStatus.Add(strconv.Itoa(mw.statusCode), 1)
 
 		// 计算我们开始处理请求后的微秒数，然后将总处理时间按此数递增。
 		duration := time.Since(start).Microseconds()
 		totalProcessingTimeMicroseconds.Add(duration)
 
-		// 在 /v1/metrics 下看到的 json 数据中 totalResponsesSent 总比 totalRequestsReceived 小 1
+		// 在 /v1/metrics 下看到的 json 数据中 totalResponsesSent 总比 totalRequestsReceived 至少小 1
 		// 这是因为 totalRequestsReceived.Add 是在 返回 json 之前被访问到  而 totalResponsesSent.Add 则总是在 json 返回之后才被访问到
 	})
 }
