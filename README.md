@@ -530,3 +530,10 @@ target: prerequisite-target-1 prerequisite-target-2 ...
 你可能认为只有在文件名冲突时才有必要将目标声明为 **虚拟 target**，但实际上，如果不将目标声明为**虚拟 target**，可能会导致错误或混乱行为。
 例如，设想一下如果将来有人在不知情的情况下在项目目录根目录下创建了一个名为 confirm 的文件。这将意味着我们的 confirm 规则永远不会被执行，
 进而导致危险或破坏性规则在未经确认的情况下被执行。
+
+## 代码管理
+- go mod tidy 命令将确保 go.mod 和 go.sum 文件列出了项目所需的所有依赖项（没有不必要的依赖项）。
+- go mod verify 命令将验证模块缓存（位于机器上的 $GOPATH/pkg/mod）中的依赖关系是否与 go.sum 文件中的加密哈希值相匹配。
+- go mod vendor 命令会将必要的源代码从模块缓存中复制到项目根目录下的新 vendor 目录中。
+
+> 这个 vendor/modules.txt 文件实质上是一份依赖软件包及其版本号的清单。使用时，go 工具会检查 modules.txt 文件中的模块版本号是否与 go.mod 文件中的版本号一致。如果有任何不一致，go 工具就会报错。
