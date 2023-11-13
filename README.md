@@ -477,3 +477,11 @@ next.ServeHTTP(mw, r)
 $ make db/migrations/
 new up
 ```
+
+### 先决条件 target 和要求确认
+```makefile
+target: prerequisite-target-1 prerequisite-target-2 ...
+command
+command
+...
+```
