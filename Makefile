@@ -1,3 +1,5 @@
+include .envrc
+
 ## help: print this help message
 # MAKEFILE_LIST 是一个特殊变量，它包含 make 正在解析的 makefile 的名称。
 # 把 help target 放在 Makefile 的第一条是有意为之。如果运行 make 而不指定目标，它将默认执行文件中的第一条规则
@@ -13,7 +15,7 @@ confirm:
 ## run/api: run the cmd/api application
 .PHONY: run/api
 run/api:
-	go run ./cmd/api
+	go run ./cmd/api -db-dsn=${GREENLIGHT_DB_DSN}
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
 db/psql:
