@@ -509,3 +509,24 @@ sed -n "s/^##//p" ${MAKEFILE_LIST} | column -t -s ":" | sed -e "s/^/ /"
   - `"s/^/ /"`: 在每行开头添加一个空格，`s/^/ /`表示在行首插入一个空格。
 
 综合起来，这个命令行的作用是从`${MAKEFILE_LIST}`中提取以"##"开头的行，然后通过`column`命令以冒号为分隔符进行格式化，最后再在每行前添加空格。
+
+### 虚拟 target
+> 普通 target 用于执行某些命令的话 很可能会跟 硬盘上实实在在存在文件产生冲突， 且优先文件
+如 `make confirm` 本来是要执行 makefile 中 confirm target 定义的命令规则 
+可是当当前目录被误新建 confirm 文件后 ，将直接找到文件便会返回，从而导致不可预料的问题
+所以需要用到 `Phony target` 虚拟 target
+
+**虚拟 target 不是真正的文件名，而只是要执行的规则的名称。**
+
+要将目标声明为 **虚拟 target**，可以将其作为特殊 .PHONY 目标的先决条件。语法如下
+```makefile
+.PHONY: target
+target: prerequisite-target-1 prerequisite-target-2 ...
+  command
+  command
+  ...
+```
+
+你可能认为只有在文件名冲突时才有必要将目标声明为 **虚拟 target**，但实际上，如果不将目标声明为**虚拟 target**，可能会导致错误或混乱行为。
+例如，设想一下如果将来有人在不知情的情况下在项目目录根目录下创建了一个名为 confirm 的文件。这将意味着我们的 confirm 规则永远不会被执行，
+进而导致危险或破坏性规则在未经确认的情况下被执行。
