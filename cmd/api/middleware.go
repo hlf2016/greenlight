@@ -4,10 +4,10 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/validator"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -69,11 +69,10 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if app.config.limiter.enabled {
 			// 从请求中提取客户端的 IP 地址。
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				app.serverErrorResponse(w, r, err)
-				return
-			}
+			// ip, _, err := net.SplitHostPort(r.RemoteAddr) // 用了 caddy 之类的反向代理后 获取的结果会不准确 改用 "github.com/tomasen/realip"
+
+			// 使用 realip.FromRequest() 函数获取客户端的真实 IP 地址。
+			ip := realip.FromRequest(r)
 
 			// 上互斥锁，以防止这段代码被同时执行。
 			mu.Lock()

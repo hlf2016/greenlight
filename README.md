@@ -537,3 +537,5 @@ target: prerequisite-target-1 prerequisite-target-2 ...
 - go mod vendor 命令会将必要的源代码从模块缓存中复制到项目根目录下的新 vendor 目录中。
 
 > 这个 vendor/modules.txt 文件实质上是一份依赖软件包及其版本号的清单。使用时，go 工具会检查 modules.txt 文件中的模块版本号是否与 go.mod 文件中的版本号一致。如果有任何不一致，go 工具就会报错。
+
+> 注：需要指出的是，没有简单的方法来验证供应商依赖项的校验和是否与 go.sum 文件中的校验和一致。换句话说，没有与 go mod verify 类似的方法可以直接对供应商文件夹中的内容进行验证。为了减少这种情况，最好定期运行 go mod verify 和 go mod vendor。使用 go mod verify 可以验证模块缓存中的依赖关系是否与 go.sum 文件相匹配，而 go mod vendor 则会将这些依赖关系从模块缓存复制到供应商文件夹中。这就是为什么我们的 make vendor 规则要同时运行这两个命令的原因之一，也是我们将其作为 make audit 规则的先决条件的原因之一。
