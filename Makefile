@@ -1,5 +1,9 @@
 include .envrc
 
+# ==================================================================================== #
+# HELPERS
+# ==================================================================================== #
+
 ## help: print this help message
 # MAKEFILE_LIST 是一个特殊变量，它包含 make 正在解析的 makefile 的名称。
 # 把 help target 放在 Makefile 的第一条是有意为之。如果运行 make 而不指定目标，它将默认执行文件中的第一条规则
@@ -12,6 +16,11 @@ help:
 .PHONY: confirm
 confirm:
 	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
+
+# ==================================================================================== #
+# DEVELOPMENT
+# ==================================================================================== #
+
 ## run/api: run the cmd/api application
 .PHONY: run/api
 run/api:
@@ -31,3 +40,21 @@ db/migrations/new:
 db/migrations/up: confirm
 	@echo "Running up migrations"
 	migrate -path ./migrations -database ${GREENLIGHT_DB_DSN} up
+
+# ==================================================================================== #
+# QUALITY CONTROL
+# ==================================================================================== #
+
+## audit: tidy dependencies and format, vet and test all code
+.PHONY: audit
+audit:
+	@echo 'Tidying and verifying module dependencies...'
+	go mod tidy
+	go mod verify
+	@echo 'Formatting code...'
+	go fmt ./...
+	@echo 'Vetting code...'
+	go vet ./...
+	staticcheck ./...
+	@echo 'Running tests...'
+	go test -race -vet=off ./...

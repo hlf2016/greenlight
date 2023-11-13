@@ -134,6 +134,9 @@ func main() {
 func openDB(cfg config) (*sql.DB, error) {
 	// 使用 sql.Open()，使用配置结构中的 DSN 创建一个空连接池。
 	db, err := sql.Open("postgres", cfg.db.dsn)
+	if err != nil {
+		return nil, err
+	}
 
 	// 设置池中打开（使用中 + 空闲）连接的最大数量。请注意，如果传递的值小于或等于 0，则表示没有限制。
 	db.SetMaxOpenConns(cfg.db.maxOpenConns)
