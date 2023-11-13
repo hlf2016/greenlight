@@ -558,3 +558,23 @@ build/api:
 @echo 'Building cmd/api...'
 go build -ldflags='-s' -o=./bin/api ./cmd/api
 ```
+## 打包缓存
+值得注意的是，go build 命令会将构建输出缓存在 Go buildcache 中。这些缓存输出将在未来的编译中酌情再次使用，从而大大加快应用程序的整体编译时间。
+
+### 查看缓存目录
+
+```shell
+$ go env GOCACHE
+/home/alex/.cache/go-build
+```
+
+> 还需要注意的是，编译缓存不会自动检测代码通过 cgo 导入的 C 库的任何更改。因此，如果你在上次联编后更改了 C 库，就需要在运行 go build 时使用 -a 标志强制重建所有软件包。或者，你也可以使用 go clean 来清除缓存：
+
+```shell
+$ go build -a -o=/bin/foo ./cmd/foo # Force all packages to be rebuilt
+$ go clean -cache # Remove everything from the build cache
+```
+
+> 注意：如果在非主软件包上运行 go build，编译输出将保存在编译缓存中，以便重复使用，但不会生成可执行文件。
+
+
