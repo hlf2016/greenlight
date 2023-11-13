@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	_ "github.com/lib/pq"
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/jsonlog"
@@ -86,7 +87,16 @@ func main() {
 		return nil
 	})
 
+	displayVersion := flag.Bool("version", false, "Display version and exit")
+
 	flag.Parse()
+
+	// 如果 displayVersiondisplay值为 true，则打印出版本号并立即退出。
+	// 没有值的布尔命令行标志被解释为值为 true。因此，使用 -version 运行应用程序与使用 -version=true 运行应用程序是一样的。
+	if *displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		os.Exit(0)
+	}
 
 	// 初始化一个新的日志记录器，将信息写入标准输出流，并以当前日期和时间为前缀。
 	// logger := log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime)
