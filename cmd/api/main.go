@@ -10,6 +10,7 @@ import (
 	"greenlight.311102.xyz/internal/data"
 	"greenlight.311102.xyz/internal/jsonlog"
 	"greenlight.311102.xyz/internal/mailer"
+	"greenlight.311102.xyz/internal/vcs"
 	"os"
 	"runtime"
 	"strings"
@@ -17,7 +18,8 @@ import (
 	"time"
 )
 
-const version = "1.0.0"
+// 将版本设为变量（而不是常量），并将其值设为 vcs.Version()。
+var version = vcs.Version()
 
 type config struct {
 	port int
